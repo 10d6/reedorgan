@@ -8,11 +8,13 @@ repo. Every change arrives as a PR from a branch; never push to `main`.
 - `index.html`: the entire instrument (markup, CSS and the Web Audio script in
   one file). Keep it a single self-contained file with no build step. The only
   external resource allowed is Google Fonts.
-- `scripts/check.mjs`: dependency-free checks that run in CI on every PR and
-  before every Pages deploy. Run `node scripts/check.mjs` before opening a PR.
+- `scripts/check.mjs`: dependency-free checks that run in CI on every PR.
+  Run `node scripts/check.mjs` before opening a PR.
 - `.github/workflows/check.yml`: runs the check on PRs and on `main`.
-- `.github/workflows/pages.yml`: publishes `index.html` to GitHub Pages on every
-  push to `main`.
+- Publishing: GitHub Pages deploys from the root of `main` (branch source,
+  not Actions), so every merge goes live within a minute or two. `.nojekyll`
+  turns off Jekyll processing. Since nothing re-checks the page at deploy
+  time, the PR check is the only gate: never open a PR with a failing check.
 
 ## Conventions
 
