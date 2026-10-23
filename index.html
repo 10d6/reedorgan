@@ -192,7 +192,10 @@ kbd{font-family:var(--f-body);font-size:13px;border:1px solid var(--brass-dim);b
 .env-grid output{font-variant-numeric:tabular-nums;font-size:13px;color:var(--text);min-width:5.2ch;text-align:right}
 
 /* Adjustments */
-.adjust-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:16px}
+.adjust-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+@media (max-width:680px){.adjust-grid{grid-template-columns:1fr}}
+.field-label{font-family:var(--f-label);font-size:15px}
+.field select{align-self:flex-start}
 .adjust-grid .rail{display:flex;flex-direction:column;gap:14px;min-width:0}
 .adjust-grid .rail-label{margin:0 0 -4px 0}
 .voicing{margin-top:16px}
@@ -327,9 +330,35 @@ kbd{font-family:var(--f-body);font-size:13px;border:1px solid var(--brass-dim);b
           <p class="sub">A bigger reservoir holds a chord longer but takes more pumping to fill.</p>
         </div>
         <div class="field">
-          <div class="field-head"><label for="sensAmt">Wind sensitivity</label><output id="sensOut" for="sensAmt">10 ¢</output></div>
+          <div class="field-head"><label for="sensAmt">Pitch drift</label><output id="sensOut" for="sensAmt">10 ¢</output></div>
           <input type="range" id="sensAmt" min="0" max="25" step="1" value="10">
-          <p class="sub">How far pitch and brightness move between empty and full. Low is a well-regulated organ, high a worn one.</p>
+          <p class="sub">How far the pitch moves between empty and full wind. Low is a well-regulated organ, high a worn one.</p>
+        </div>
+      </div>
+      <div class="rail">
+        <p class="rail-label">Wind tone</p>
+        <div class="field">
+          <label for="toneModel" class="field-label">Tone model</label>
+          <select id="toneModel">
+            <option value="tilt">Natural tilt</option>
+            <option value="sweep">Filter sweep (original)</option>
+          </select>
+          <p class="sub" id="toneModelSub"></p>
+        </div>
+        <div class="field">
+          <div class="field-head"><label for="toneDepthAmt">Depth</label><output id="toneDepthOut" for="toneDepthAmt">60%</output></div>
+          <input type="range" id="toneDepthAmt" min="0" max="150" step="5" value="60">
+          <p class="sub">How much the tone changes between empty and full wind. Loudness still follows the wind at any setting.</p>
+        </div>
+        <div class="field">
+          <div class="field-head"><label for="toneQAmt">Resonance</label><output id="toneQOut" for="toneQAmt">Q 0.70</output></div>
+          <input type="range" id="toneQAmt" min="0" max="100" step="1" value="12">
+          <p class="sub">The peak at the edge of the swell filter. Low is smooth; high adds a vocal, nasal bump that makes any movement more obvious.</p>
+        </div>
+        <div class="field">
+          <div class="field-head"><label for="toneRespAmt">Response</label><output id="toneRespOut" for="toneRespAmt">250 ms</output></div>
+          <input type="range" id="toneRespAmt" min="0" max="100" step="1" value="55">
+          <p class="sub">How quickly the tone follows the wind. Slower smooths out the ripple from each treadle stroke.</p>
         </div>
       </div>
       <div class="rail">
@@ -415,8 +444,8 @@ const reduceMotion=window.matchMedia('(prefers-reduced-motion: reduce)').matches
 const store={get(k,d){try{const v=localStorage.getItem('reed-'+k);return v==null?d:JSON.parse(v);}catch(e){return d;}},
              set(k,v){try{localStorage.setItem('reed-'+k,JSON.stringify(v));}catch(e){}}};
 
-let pressure=.5, lastSide=null, reliefT=0, started=false, swellPos=0;
-let ctx=null, waves, buses={bass:[],treble:[]}, swell, windGain, trem, lfo, lfoAmp, lfoFilt, windPitch, noiseGain;
+let pressure=.5, lastSide=null, reliefT=0, started=false, swellPos=0, tonePress=.5;
+let ctx=null, waves, buses={bass:[],treble:[]}, swell, tilt, windGain, trem, lfo, lfoAmp, lfoFilt, windPitch, noiseGain;
 let cabDry, cabWet, roomWet;
 let splitMode=SPLITS[store.get('split','none')]?store.get('split','none'):'none';
 const splitNote=()=>SPLITS[splitMode].note;
@@ -438,6 +467,25 @@ const fmtX=(_,x)=>x.toFixed(x<.95?2:1)+'×';
 const swellS =bindSlider('swellAmt','swell',0, v=>v===0?'Closed':v===100?'Full':v+'%',null,v=>v/100);
 const resS   =bindSlider('resAmt','reservoir',45, fmtX,null,logMap(.4,3));
 const sensS  =bindSlider('sensAmt','sensitivity',10, v=>v+' ¢');
+
+/* Wind tone: how the wind colours the sound.
+   tilt  – a high shelf around 1.2 kHz whose gain follows the wind, so upper
+           harmonics grow relative to the fundamental as a free reed does under
+           more pressure. The filter edge never moves, so there is no wah.
+   sweep – the original model: a lowpass whose cutoff follows the wind. */
+const TONE_MODELS={
+  tilt:'Upper harmonics grow and fade against the fundamental as the wind changes, the way a reed responds to pressure. The filter edge stays put, so there is no wah.',
+  sweep:'A lowpass filter whose cutoff follows the wind. Dramatic, and at high depth or resonance it sounds like a wah.'
+};
+const toneModelEl=document.getElementById('toneModel'),toneModelSub=document.getElementById('toneModelSub');
+let toneModel=TONE_MODELS[store.get('toneModel','tilt')]?store.get('toneModel','tilt'):'tilt';
+toneModelEl.value=toneModel;toneModelSub.textContent=TONE_MODELS[toneModel];
+toneModelEl.addEventListener('change',()=>{
+  toneModel=toneModelEl.value;store.set('toneModel',toneModel);toneModelSub.textContent=TONE_MODELS[toneModel];
+});
+const toneDepthS=bindSlider('toneDepthAmt','toneDepth',60, v=>v===0?'None':v+'%',null,v=>v/100);
+const toneQS   =bindSlider('toneQAmt','toneQ',12, (_,q)=>'Q '+q.toFixed(2),null,logMap(.5,8));
+const toneRespS=bindSlider('toneRespAmt','toneResponse',55, (_,t)=>t<.1?Math.round(t*1000)+' ms':t<1?Math.round(t*100)*10+' ms':t.toFixed(1)+' s',null,logMap(.02,2));
 const speechS=bindSlider('speechAmt','speech',33, fmtX,null,logMap(.5,4));
 const scoopS =bindSlider('scoopAmt','scoop',16, v=>v===0?'None':v+' ¢');
 const beatS  =bindSlider('beatAmt','celesteBeat',1.5, v=>v.toFixed(1)+' /s',()=>retune(CELESTE));
@@ -696,7 +744,8 @@ function initAudio(){
   const AC=window.AudioContext||window.webkitAudioContext;if(!AC)return;
   ctx=new AC();
   waves=RANKS.map((_,i)=>rankWave(i));
-  swell=ctx.createBiquadFilter();swell.type='lowpass';swell.Q.value=.7;swell.frequency.value=2000;
+  swell=ctx.createBiquadFilter();swell.type='lowpass';swell.Q.value=toneQS.value;swell.frequency.value=2300;
+  tilt=ctx.createBiquadFilter();tilt.type='highshelf';tilt.frequency.value=1200;tilt.gain.value=0;
   windGain=ctx.createGain();windGain.gain.value=0;
   trem=ctx.createGain();trem.gain.value=1;
   lfo=ctx.createOscillator();lfo.frequency.value=+voxEl.value;
@@ -716,7 +765,7 @@ function initAudio(){
   const cabSum=ctx.createGain();
   const master=ctx.createGain();master.gain.value=.8;
   HALVES.forEach(h=>RANKS.forEach((r,i)=>{const g=ctx.createGain();g.gain.value=stops[h][r.id]?rankLevel(i):0;g.connect(swell);buses[h][i]=g;}));
-  swell.connect(windGain).connect(trem).connect(body1).connect(body2).connect(shelf);
+  swell.connect(tilt).connect(windGain).connect(trem).connect(body1).connect(body2).connect(shelf);
   // reeds → cabinet (dry + boxy reflections) → room (dry + long tail)
   shelf.connect(cabDry).connect(cabSum);shelf.connect(cabConv).connect(cabWet).connect(cabSum);
   cabSum.connect(dry).connect(comp);cabSum.connect(conv).connect(roomWet).connect(comp);
@@ -1030,14 +1079,25 @@ function frame(now){
   pressure=Math.max(0,pressure);reliefT=Math.max(0,reliefT-dt);
 
   // wind sensitivity scales how far pitch and brightness move away from a mid-gauge reading
-  const sens=sensS.value/10, P_REF=.55;
+  const P_REF=.55;
   const cents=(pressure-P_REF)*sensS.value;
+  // tone follows a smoothed copy of the wind so treadle ripples don't flutter it
+  tonePress+=(pressure-tonePress)*Math.min(1,dt/toneRespS.value);
   if(ctx){
     const t=ctx.currentTime,p=pressure;
     const speak=p<.04?0:Math.min(1,(p-.04)/.12);
-    const bRef=windBright(P_REF),bright=Math.max(0,bRef+(windBright(p)-bRef)*sens);
+    const bRef=windBright(P_REF),dBright=(windBright(tonePress)-bRef)*toneDepthS.value;
     windGain.gain.setTargetAtTime(speak*windLevel(p)*1.7*(1+.25*swellPos),t,.03);
-    swell.frequency.setTargetAtTime(450+4200*Math.pow(bright,1.4)*(1+.7*swellPos),t,.04);
+    swell.Q.setTargetAtTime(toneQS.value,t,.05);
+    if(toneModel==='sweep'){
+      // depth 100% reproduces the original sweep exactly
+      swell.frequency.setTargetAtTime(450+4200*Math.pow(Math.max(0,bRef+dBright),1.4)*(1+.7*swellPos),t,.04);
+      tilt.gain.setTargetAtTime(0,t,.05);
+    }else{
+      // the lid filter sits where the sweep would at a mid-gauge reading; only the swell moves it
+      swell.frequency.setTargetAtTime(2300*(1+1.4*swellPos),t,.04);
+      tilt.gain.setTargetAtTime(Math.max(-24,18*dBright),t,.04);   // about −7 dB empty, +3 dB full at 60%
+    }
     windPitch.offset.setTargetAtTime(cents,t,.05);
     noiseGain.gain.setTargetAtTime(.025*p*Math.min(1,sounding/3)*breathS.value,t,.05);
   }
