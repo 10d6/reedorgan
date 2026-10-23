@@ -25,9 +25,12 @@ changes the organ's loudness, brightness, pitch and how quickly notes speak.
 - **Octave couplers**: Sub Octave and Super Octave pull down the keys an octave
   below or above, so each coupled note sounds with the stops drawn in its own
   half. Drawing one while holding a chord brings the octave in straight away.
-- **Vox Humana** fan tremolo with adjustable speed, and a continuous **knee
-  swell** that opens the lid gradually for a louder, brighter sound that uses
-  more wind.
+- **Vox Humana** fan tremolo. Speed, volume wobble, tone wobble and stereo sweep
+  are adjustable, with a *Smooth* or *Spinning fan* shape (brief dips as two
+  slightly mismatched blades pass). The fan spins up when the stop is drawn and
+  coasts down when it's retired.
+- A continuous **knee swell** that opens the lid gradually for a louder,
+  brighter sound that uses more wind.
 - **Treadle envelopes**: each foot has its own attack, decay, sustain and release
   for the airflow, from 5 ms up to 30 s.
 - **Wind behaviour**: loudness rises up to about 2″ on the gauge and then levels
