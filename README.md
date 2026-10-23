@@ -33,9 +33,13 @@ changes the organ's loudness, brightness, pitch and how quickly notes speak.
 - **Wind behaviour**: loudness rises up to about 2″ on the gauge and then levels
   off. Low wind sounds darker and flatter; high wind sounds brighter and slightly
   sharp, and the relief valve vents when the reservoir is full.
-- **Adjustments**: reservoir size, wind sensitivity (how far pitch and
-  brightness move with pressure), reed speech speed, pitch scoop, Celeste beat
-  rate, Cabinet and Room reverb, breath noise level and treadle noise level.
+- **Adjustments**: reservoir size, pitch drift with pressure, reed speech
+  speed, pitch scoop, Celeste beat rate, Cabinet and Room reverb, breath noise
+  level and treadle noise level.
+- **Wind tone**: how the wind colours the sound. *Natural tilt* (the default)
+  shifts the balance of upper harmonics against the fundamental, as a real reed
+  does; *Filter sweep* is the original moving lowpass. Depth, resonance (Q) and
+  response time are adjustable.
 - **Rank voicing**: a drawer under Adjustments with level, fine tuning (±20
   cents) and brightness for each rank, plus a button to restore the factory
   voicing. Brightness reshapes the rank's harmonics and is level-matched, so it
