@@ -20,10 +20,16 @@ repo. Every change arrives as a PR from a branch; never push to `main`.
   design is deliberately single-theme (dark walnut cabinet).
 - User settings persist through the `store` helper (localStorage wrapped in
   try/catch). New sliders should save and restore their value the same way.
-- Audio graph: rank buses → swell lowpass → wind gain → tremolo → body EQ →
+- Audio graph: rank buses (one set per half: `buses.bass[i]`, `buses.treble[i]`;
+  a note routes by `halfOf(m)`) → swell lowpass → wind gain → tremolo → body EQ →
   cabinet convolver (dry/wet) → room convolver (dry/wet) → compressor → output.
-  Wind pressure (0–1, gauge reads `pressure × 3.6″`) drives level, brightness
-  and pitch in the `frame()` loop.
+  Breath noise joins at the tremolo. Wind pressure (0–1, gauge reads
+  `pressure × 3.6″`) drives level, brightness and pitch in the `frame()` loop,
+  scaled by the knee swell (`swellPos`, smoothed) and wind sensitivity.
+- Stop state is `stops.bass[id]` / `stops.treble[id]` plus `stops.vox`. When
+  stops are not divided, both halves are kept identical.
+- New sliders: use `bindSlider(id, storeKey, default, format, onChange, map)`.
+  The input id ends in `Amt` and its `<output>` uses the same name ending in `Out`.
 - Keep the "Things to listen for" notes and the README in step with features.
 - In a PR description, say what changed in terms of what the player hears or
   does, and list anything to try after merging.

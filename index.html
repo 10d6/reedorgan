@@ -91,6 +91,18 @@ button{font:inherit;color:inherit}
   box-shadow:0 0 0 3px var(--brass),0 0 0 5px #120a06,0 8px 14px -4px #000,inset 0 -3px 6px rgba(0,0,0,.2);
 }
 .stop.fx .nm{color:#5a1b25}
+.rail-head{display:flex;justify-content:space-between;align-items:center;gap:8px 16px;flex-wrap:wrap;margin:0 0 12px}
+.rail-head .rail-label{margin:0 0 0 4px}
+select{
+  font-family:var(--f-label);font-size:14px;color:var(--text);background:#2e1a10;
+  border:1px solid var(--brass-dim);border-radius:6px;padding:4px 8px;max-width:100%;
+}
+.stop-groups{display:flex;flex-wrap:wrap;justify-content:center;gap:16px 32px}
+.stop-group{display:flex;flex-direction:column;align-items:center;gap:10px;min-width:0}
+.group-label{font-family:var(--f-label);font-style:italic;font-size:13px;color:var(--muted);margin:0}
+.divided .stop{width:66px;height:66px}
+.divided .stop .nm{font-size:11.5px}
+.divided .stop .ft{font-size:11px}
 .vox-ctl{display:flex;flex-direction:column;gap:4px;max-width:360px;margin:16px auto 0;padding:0 4px}
 .vox-ctl label{font-family:var(--f-label);font-size:15px}
 .vox-ctl output{font-variant-numeric:tabular-nums;color:var(--text);font-size:14px}
@@ -148,10 +160,12 @@ kbd{font-family:var(--f-body);font-size:13px;border:1px solid var(--brass-dim);b
 .black .lbl{color:#7a6650}
 .white.down{background:linear-gradient(180deg,#e6dbbd,#ddd0ab);box-shadow:inset 0 -2px 0 #c7b68c;transform:translateY(2px)}
 .black.down{box-shadow:inset 0 -1px 0 #33271f;transform:translateY(2px);background:linear-gradient(180deg,#221a14,#0a0705)}
+/* brass notch in the keybed where the treble half of divided stops begins */
+.white.split::after{content:"";position:absolute;left:-3px;top:-9px;width:3px;height:8px;background:var(--brass);border-radius:1px}
 
-/* Treadles + envelopes */
-.feet-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;margin:0 0 4px}
-.feet-head h2{font-family:var(--f-display);font-weight:400;font-size:20px;color:var(--brass);margin:0;letter-spacing:.03em}
+/* Section headings, treadles + envelopes */
+.sec-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;margin:0 0 4px}
+.sec-head h2{font-family:var(--f-display);font-weight:400;font-size:20px;color:var(--brass);margin:0;letter-spacing:.03em}
 .feet{display:grid;grid-template-columns:1fr 1fr;gap:20px}
 .foot{display:flex;flex-direction:column;gap:14px;align-items:stretch;min-width:0}
 .treadle{
@@ -176,6 +190,11 @@ kbd{font-family:var(--f-body);font-size:13px;border:1px solid var(--brass-dim);b
 .env-grid{display:grid;grid-template-columns:auto 1fr auto;gap:6px 10px;align-items:center}
 .env-grid label{font-family:var(--f-label);font-size:14px}
 .env-grid output{font-variant-numeric:tabular-nums;font-size:13px;color:var(--text);min-width:5.2ch;text-align:right}
+
+/* Adjustments */
+.adjust-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:16px}
+.adjust-grid .rail{display:flex;flex-direction:column;gap:14px;min-width:0}
+.adjust-grid .rail-label{margin:0 0 -4px 0}
 
 /* Notes */
 .notes{max-width:1000px;margin:28px auto 0;display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:18px 28px}
@@ -207,8 +226,17 @@ kbd{font-family:var(--f-body);font-size:13px;border:1px solid var(--brass-dim);b
   </header>
 
   <section class="rail" aria-label="Stops">
-    <p class="rail-label">Draw stops</p>
-    <div class="stops" id="stops"></div>
+    <div class="rail-head">
+      <p class="rail-label">Draw stops</p>
+      <label class="check" for="split">Stops
+        <select id="split">
+          <option value="none">not divided</option>
+          <option value="ef">divided at E | F (traditional)</option>
+          <option value="bc">divided at middle C</option>
+        </select>
+      </label>
+    </div>
+    <div class="stop-groups" id="stops"></div>
     <div class="vox-ctl">
       <div class="field-head"><label for="voxRate">Vox Humana fan speed</label><output id="voxOut" for="voxRate">5.6 Hz</output></div>
       <input type="range" id="voxRate" min="1" max="12" step="0.1" value="5.6">
@@ -239,21 +267,9 @@ kbd{font-family:var(--f-body);font-size:13px;border:1px solid var(--brass-dim);b
 
     <div class="ctrls">
       <div class="field">
-        <div class="field-head"><label for="helper">Helper pump</label><output id="helperOut" for="helper">Off</output></div>
-        <input type="range" id="helper" min="0" max="100" step="1" value="0">
-        <p class="sub" id="helperSub">An invisible assistant pumps at a steady rate. Below what you're playing, the wind slowly runs out.</p>
-      </div>
-      <div class="field">
-        <div class="field-head"><label for="cabAmt">Cabinet</label><output id="cabOut" for="cabAmt">45%</output></div>
-        <input type="range" id="cabAmt" min="0" max="100" step="1" value="45">
-      </div>
-      <div class="field">
-        <div class="field-head"><label for="roomAmt">Room</label><output id="roomOut" for="roomAmt">30%</output></div>
-        <input type="range" id="roomAmt" min="0" max="100" step="1" value="30">
-      </div>
-      <div class="field">
-        <div class="field-head"><label for="thumpAmt">Treadle noise</label><output id="thumpOut" for="thumpAmt">60%</output></div>
-        <input type="range" id="thumpAmt" min="0" max="100" step="1" value="60">
+        <div class="field-head"><label for="swellAmt">Knee swell</label><output id="swellOut" for="swellAmt">Closed</output></div>
+        <input type="range" id="swellAmt" min="0" max="100" step="1" value="0">
+        <p class="sub">Opens the swell lid: louder and brighter, but it uses more wind. A MIDI expression pedal (CC11 or CC4) moves it too.</p>
       </div>
       <div class="field">
         <div class="midi-row">
@@ -270,12 +286,75 @@ kbd{font-family:var(--f-body);font-size:13px;border:1px solid var(--brass-dim);b
   </section>
 
   <section aria-label="Treadles">
-    <div class="feet-head">
+    <div class="sec-head">
       <h2>Treadles</h2>
       <label class="check" for="link"><input type="checkbox" id="link" checked> Same envelope for both feet</label>
     </div>
     <p class="sub" style="margin:0 0 14px">Each treadle feeds air through its own envelope. Pressing starts the attack; holding keeps the sustain flowing; letting go starts the release. Times run up to 30 seconds.</p>
     <div class="feet" id="feet"></div>
+  </section>
+
+  <section aria-label="Adjustments">
+    <div class="sec-head"><h2>Adjustments</h2></div>
+    <p class="sub" style="margin:0 0 14px">The regulator's bench: how the wind behaves, how the reeds speak, and the space around the organ.</p>
+    <div class="adjust-grid">
+      <div class="rail">
+        <p class="rail-label">Wind</p>
+        <div class="field">
+          <div class="field-head"><label for="helper">Helper pump</label><output id="helperOut" for="helper">Off</output></div>
+          <input type="range" id="helper" min="0" max="100" step="1" value="0">
+          <p class="sub">An invisible assistant pumps at a steady rate. Below what you're playing, the wind slowly runs out.</p>
+        </div>
+        <div class="field">
+          <div class="field-head"><label for="resAmt">Reservoir size</label><output id="resOut" for="resAmt">1.0×</output></div>
+          <input type="range" id="resAmt" min="0" max="100" step="1" value="45">
+          <p class="sub">A bigger reservoir holds a chord longer but takes more pumping to fill.</p>
+        </div>
+        <div class="field">
+          <div class="field-head"><label for="sensAmt">Wind sensitivity</label><output id="sensOut" for="sensAmt">10 ¢</output></div>
+          <input type="range" id="sensAmt" min="0" max="25" step="1" value="10">
+          <p class="sub">How far pitch and brightness move between empty and full. Low is a well-regulated organ, high a worn one.</p>
+        </div>
+      </div>
+      <div class="rail">
+        <p class="rail-label">Reeds</p>
+        <div class="field">
+          <div class="field-head"><label for="speechAmt">Speech speed</label><output id="speechOut" for="speechAmt">1.0×</output></div>
+          <input type="range" id="speechAmt" min="0" max="100" step="1" value="33">
+          <p class="sub">How slowly each note blooms in. Higher is slower.</p>
+        </div>
+        <div class="field">
+          <div class="field-head"><label for="scoopAmt">Pitch scoop</label><output id="scoopOut" for="scoopAmt">16 ¢</output></div>
+          <input type="range" id="scoopAmt" min="0" max="40" step="1" value="16">
+          <p class="sub">How far flat each note starts before it settles.</p>
+        </div>
+        <div class="field">
+          <div class="field-head"><label for="beatAmt">Celeste beat</label><output id="beatOut" for="beatAmt">1.5 /s</output></div>
+          <input type="range" id="beatAmt" min="0.5" max="6" step="0.1" value="1.5">
+          <p class="sub">How fast the Celeste shimmers against the other 8′ ranks, the same on every note.</p>
+        </div>
+      </div>
+      <div class="rail">
+        <p class="rail-label">Case and room</p>
+        <div class="field">
+          <div class="field-head"><label for="cabAmt">Cabinet</label><output id="cabOut" for="cabAmt">45%</output></div>
+          <input type="range" id="cabAmt" min="0" max="100" step="1" value="45">
+        </div>
+        <div class="field">
+          <div class="field-head"><label for="roomAmt">Room</label><output id="roomOut" for="roomAmt">30%</output></div>
+          <input type="range" id="roomAmt" min="0" max="100" step="1" value="30">
+        </div>
+        <div class="field">
+          <div class="field-head"><label for="breathAmt">Breath noise</label><output id="breathOut" for="breathAmt">100%</output></div>
+          <input type="range" id="breathAmt" min="0" max="300" step="5" value="100">
+          <p class="sub">The hiss of air through the reed cells. It still follows the wind and how many notes are playing.</p>
+        </div>
+        <div class="field">
+          <div class="field-head"><label for="thumpAmt">Treadle noise</label><output id="thumpOut" for="thumpAmt">60%</output></div>
+          <input type="range" id="thumpAmt" min="0" max="100" step="1" value="60">
+        </div>
+      </div>
+    </div>
   </section>
 </div>
 
@@ -284,8 +363,9 @@ kbd{font-family:var(--f-body);font-size:13px;border:1px solid var(--brass-dim);b
   <div><h3>Let the wind run out</h3><p>Set the helper low, hold a chord and stop pumping. The sound gets quieter, then darker, and sags a few cents flat before the reeds stop speaking.</p></div>
   <div><h3>Pump harder</h3><p>Strong, alternating strokes push the reeds harder. They get brighter and buzzier, and the pitch creeps sharp. Push too hard and the relief valve vents.</p></div>
   <div><h3>Slow-motion feet</h3><p>Give a treadle a long attack and release. The organ swells in and fades away on its own, like a very patient player.</p></div>
-  <div><h3>The shimmer</h3><p>Draw Celeste with Diapason. The Celeste reeds are tuned 7 cents sharp, so the two ranks beat against each other in a slow wave.</p></div>
-  <div><h3>Vox Humana and Forte</h3><p>Vox Humana spins a little fan for a wavering tremolo. Forte opens the swell lid: louder and brighter, but it drinks wind faster.</p></div>
+  <div><h3>The shimmer</h3><p>Draw Celeste with Diapason. The Celeste reeds are tuned a little sharp so the two ranks beat against each other in a slow wave. Celeste beat sets how fast, the same on every note.</p></div>
+  <div><h3>Melody and accompaniment</h3><p>Divide the stops, then draw soft Melodia in the bass and Diapason with Celeste in the treble. The tune sings out over a quiet accompaniment.</p></div>
+  <div><h3>Swell and fan</h3><p>Vox Humana spins a little fan for a wavering tremolo. The knee swell opens the lid gradually: louder and brighter, but it drinks wind faster.</p></div>
 </section>
 
 <script>
@@ -294,19 +374,50 @@ const RANKS=[
   {id:'bourdon',  nm:'Bourdon',  ft:'16′', mult:.5, wave:'mellow', det:0,  level:.85},
   {id:'diapason', nm:'Diapason', ft:'8′',  mult:1,  wave:'reed',   det:0,  level:1},
   {id:'melodia',  nm:'Melodia',  ft:'8′',  mult:1,  wave:'mellow', det:-2, level:.9},
-  {id:'celeste',  nm:'Celeste',  ft:'8′',  mult:1,  wave:'reed',   det:7,  level:.75},
+  {id:'celeste',  nm:'Celeste',  ft:'8′',  mult:1,  wave:'reed',   det:0,  level:.75, celeste:true},
   {id:'principal',nm:'Principal',ft:'4′',  mult:2,  wave:'thin',   det:1,  level:.5},
 ];
-const FX=[{id:'vox',nm:'Vox Humana',ft:'tremolo'},{id:'forte',nm:'Forte',ft:'swell'}];
-const stops={diapason:true,melodia:true};
+const CELESTE=RANKS.findIndex(r=>r.celeste);
+const HALVES=['bass','treble'];
+// Each rank can be drawn separately in the bass and treble halves (divided stops).
+const stops={bass:{diapason:true,melodia:true},treble:{diapason:true,melodia:true},vox:false};
+const SPLITS={none:{note:0,bass:'',treble:''},
+              ef:{note:53,bass:'Bass · up to E below middle C',treble:'Treble · from F below middle C'},
+              bc:{note:60,bass:'Bass · below middle C',treble:'Treble · from middle C'}};
 const reduceMotion=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 const store={get(k,d){try{const v=localStorage.getItem('reed-'+k);return v==null?d:JSON.parse(v);}catch(e){return d;}},
              set(k,v){try{localStorage.setItem('reed-'+k,JSON.stringify(v));}catch(e){}}};
 
-let pressure=.5, lastSide=null, reliefT=0, started=false;
-let ctx=null, waves, buses=[], swell, windGain, trem, lfo, lfoAmp, lfoFilt, windPitch, noiseGain;
+let pressure=.5, lastSide=null, reliefT=0, started=false, swellPos=0;
+let ctx=null, waves, buses={bass:[],treble:[]}, swell, windGain, trem, lfo, lfoAmp, lfoFilt, windPitch, noiseGain;
 let cabDry, cabWet, roomWet;
+let splitMode=SPLITS[store.get('split','none')]?store.get('split','none'):'none';
+const splitNote=()=>SPLITS[splitMode].note;
+const halfOf=m=>m<splitNote()?'bass':'treble';
+
+/* Sliders that save themselves: fmt turns the slider value into its readout,
+   map turns it into the value the sound uses. */
+function bindSlider(id,key,def,fmt,onChange,map=v=>v){
+  const el=document.getElementById(id),out=document.getElementById(id.replace('Amt','Out'));
+  const s={el,value:map(def)};
+  const show=()=>{s.value=map(+el.value);out.textContent=fmt(+el.value,s.value);};
+  s.set=(v,save=true)=>{el.value=v;show();if(save)store.set(key,+el.value);if(onChange)onChange(s.value);};
+  el.value=store.get(key,def);show();
+  el.addEventListener('input',()=>{initAudio();show();store.set(key,+el.value);if(onChange)onChange(s.value);});
+  return s;
+}
+const logMap=(lo,hi)=>v=>lo*Math.pow(hi/lo,v/100);
+const fmtX=(_,x)=>x.toFixed(x<10?(x<1?2:1):0)+'×';
+const swellS =bindSlider('swellAmt','swell',0, v=>v===0?'Closed':v===100?'Full':v+'%',null,v=>v/100);
+const resS   =bindSlider('resAmt','reservoir',45, fmtX,null,logMap(.4,3));
+const sensS  =bindSlider('sensAmt','sensitivity',10, v=>v+' ¢');
+const speechS=bindSlider('speechAmt','speech',33, fmtX,null,logMap(.5,4));
+const scoopS =bindSlider('scoopAmt','scoop',16, v=>v===0?'None':v+' ¢');
+const beatS  =bindSlider('beatAmt','celesteBeat',1.5, v=>v.toFixed(1)+' /s',()=>retuneCeleste());
+const breathS=bindSlider('breathAmt','breath',100, v=>v===0?'Off':v+'%',null,v=>v/100);
+// Celeste offset in cents so it beats at the same rate on every note
+const celesteCents=f=>1200*Math.log2(1+beatS.value/f);
 
 /* Cabinet, room and treadle-noise levels */
 const mix={cab:store.get('cab',45),room:store.get('room',30),thump:store.get('thump',60)};
@@ -350,16 +461,45 @@ const windBright=p=>p<=KNEE?p:KNEE+(p-KNEE)*.5;
 const voices=new Map();   // midi -> {refs, oscs, envs, released}
 
 /* ---------- stop rail ---------- */
-const stopsEl=document.getElementById('stops');
-[...RANKS,...FX].forEach(s=>{
+const stopsEl=document.getElementById('stops'),splitEl=document.getElementById('split');
+function knob(nm,ft,on,label,toggle,fx){
   const b=document.createElement('button');
-  b.className='stop'+(FX.includes(s)?' fx':'');
-  b.id='stop-'+s.id;b.type='button';
-  b.setAttribute('aria-pressed',stops[s.id]?'true':'false');
-  b.innerHTML=`<span class="nm">${s.nm}</span><span class="ft">${s.ft}</span>`;
-  b.addEventListener('click',()=>{stops[s.id]=!stops[s.id];b.setAttribute('aria-pressed',stops[s.id]);initAudio();applyStops();});
-  stopsEl.appendChild(b);
+  b.className='stop'+(fx?' fx':'');b.type='button';
+  b.setAttribute('aria-pressed',on?'true':'false');b.setAttribute('aria-label',label);
+  b.innerHTML=`<span class="nm">${nm}</span><span class="ft">${ft}</span>`;
+  b.addEventListener('click',()=>{const now=toggle();b.setAttribute('aria-pressed',now?'true':'false');initAudio();applyStops();});
+  return b;
+}
+function group(caption,knobs){
+  const g=document.createElement('div');g.className='stop-group';
+  if(caption){const p=document.createElement('p');p.className='group-label';p.textContent=caption;g.appendChild(p);}
+  const row=document.createElement('div');row.className='stops';knobs.forEach(k=>row.appendChild(k));g.appendChild(row);
+  return g;
+}
+function renderStops(){
+  stopsEl.innerHTML='';
+  const divided=splitMode!=='none';
+  stopsEl.classList.toggle('divided',divided);
+  const vox=knob('Vox Humana','tremolo',stops.vox,'Vox Humana tremolo',()=>(stops.vox=!stops.vox),true);
+  if(!divided){
+    const ks=RANKS.map(r=>knob(r.nm,r.ft,stops.treble[r.id],`${r.nm} ${r.ft}`,()=>{
+      const v=!stops.treble[r.id];stops.bass[r.id]=v;stops.treble[r.id]=v;return v;}));
+    stopsEl.appendChild(group('',[...ks,vox]));
+    return;
+  }
+  HALVES.forEach(h=>{
+    const ks=RANKS.map(r=>knob(r.nm,r.ft,stops[h][r.id],`${h==='bass'?'Bass':'Treble'} ${r.nm} ${r.ft}`,()=>(stops[h][r.id]=!stops[h][r.id])));
+    stopsEl.appendChild(group(SPLITS[splitMode][h],ks));
+  });
+  stopsEl.appendChild(group('Whole keyboard',[vox]));
+}
+splitEl.value=splitMode;
+splitEl.addEventListener('change',()=>{
+  splitMode=splitEl.value;store.set('split',splitMode);
+  if(splitMode==='none')RANKS.forEach(r=>{const v=!!(stops.bass[r.id]||stops.treble[r.id]);stops.bass[r.id]=v;stops.treble[r.id]=v;});
+  renderStops();range=null;buildKeys();applyStops();
 });
+renderStops();
 
 /* ---------- gauge ---------- */
 const GMAX=4;
@@ -402,7 +542,7 @@ function buildKeys(){
       el.className='key black';
       const bw=W*.6;
       el.style.left=`calc(${wi*W - bw/2}% - 0.5px)`;el.style.width=bw+'%';
-    }else{el.className='key white';wi++;}
+    }else{el.className='key white'+(m===splitNote()&&m>r[0]?' split':'');wi++;}
     el.innerHTML=lbl;
     keysEl.appendChild(el);
   }
@@ -472,7 +612,7 @@ function initAudio(){
   cabWet=ctx.createGain();cabWet.gain.value=0;
   const cabSum=ctx.createGain();
   const master=ctx.createGain();master.gain.value=.8;
-  RANKS.forEach((r,i)=>{const g=ctx.createGain();g.gain.value=stops[r.id]?r.level:0;g.connect(swell);buses[i]=g;});
+  HALVES.forEach(h=>RANKS.forEach((r,i)=>{const g=ctx.createGain();g.gain.value=stops[h][r.id]?r.level:0;g.connect(swell);buses[h][i]=g;}));
   swell.connect(windGain).connect(trem).connect(body1).connect(body2).connect(shelf);
   // reeds → cabinet (dry + boxy reflections) → room (dry + long tail)
   shelf.connect(cabDry).connect(cabSum);shelf.connect(cabConv).connect(cabWet).connect(cabSum);
@@ -489,7 +629,7 @@ function initAudio(){
 }
 function applyStops(){
   if(!ctx)return;const t=ctx.currentTime;
-  RANKS.forEach((r,i)=>buses[i].gain.setTargetAtTime(stops[r.id]?r.level:0,t,.04));
+  HALVES.forEach(h=>RANKS.forEach((r,i)=>buses[h][i].gain.setTargetAtTime(stops[h][r.id]?r.level:0,t,.04)));
   lfoAmp.gain.setTargetAtTime(stops.vox?.22:0,t,.15);
   lfoFilt.gain.setTargetAtTime(stops.vox?120:0,t,.15);
 }
@@ -501,21 +641,31 @@ function noteOn(m){
   if(v&&!v.released){v.refs++;return;}
   if(v)killVoice(v,.01);
   const t=ctx.currentTime,f=440*Math.pow(2,(m-69)/12);
-  const tc=.012+.06*(1-Math.min(1,pressure));     // low wind = slower speech
+  const speech=speechS.value;
+  const tc=(.012+.06*(1-Math.min(1,pressure)))*speech;   // low wind = slower speech
   const amp=.11*Math.max(.55,1-(m-48)*.006);
-  v={refs:1,oscs:[],envs:[],released:false};
+  const half=halfOf(m);
+  v={refs:1,oscs:[],envs:[],released:false,half,f,m};
   RANKS.forEach((r,i)=>{
     const o=ctx.createOscillator();o.setPeriodicWave(waves[r.wave]);
     o.frequency.value=f*r.mult;
-    const base=r.det+reedOffset(m+i*7);
-    o.detune.setValueAtTime(base-16,t);o.detune.setTargetAtTime(base,t,.04);
+    const base=(r.celeste?celesteCents(f*r.mult):r.det)+reedOffset(m+i*7);
+    o.detune.setValueAtTime(base-scoopS.value,t);o.detune.setTargetAtTime(base,t,.04*speech);
     windPitch.connect(o.detune);
     const g=ctx.createGain();g.gain.setValueAtTime(0,t);g.gain.setTargetAtTime(amp,t,tc);
-    o.connect(g).connect(buses[i]);o.start(t);
+    o.connect(g).connect(buses[half][i]);o.start(t);
     o.onended=()=>{try{windPitch.disconnect(o.detune);}catch(e){}g.disconnect();};
     v.oscs.push(o);v.envs.push(g);
   });
   voices.set(m,v);markKey(m,true);
+}
+// Moving the Celeste beat slider retunes notes that are already sounding.
+function retuneCeleste(){
+  if(!ctx)return;const t=ctx.currentTime,r=RANKS[CELESTE];
+  for(const v of voices.values()){
+    if(v.released)continue;
+    v.oscs[CELESTE].detune.setTargetAtTime(celesteCents(v.f*r.mult)+reedOffset(v.m+CELESTE*7),t,.08);
+  }
 }
 function killVoice(v,tc){
   const t=ctx.currentTime;v.released=true;
@@ -733,6 +883,8 @@ function onMidi(ev){
     if(d1===64){                               // sustain pedal holds notes
       sustain=d2>=64;
       if(!sustain){sustained.forEach(noteOff);sustained.clear();}
+    }else if(d1===11||d1===4){                 // expression / foot pedal works the knee swell
+      swellS.set(Math.round(d2/127*100));
     }else if(d1===123||d1===120){              // all notes off
       midiHeld.forEach(noteOff);sustained.forEach(noteOff);midiHeld.clear();sustained.clear();
     }
@@ -745,9 +897,13 @@ const rWind=document.getElementById('rWind'),rPitch=document.getElementById('rPi
 let last=performance.now(),uiT=0;
 function frame(now){
   const dt=Math.min(.05,(now-last)/1000);last=now;
-  let sounding=0;for(const v of voices.values())if(!v.released)sounding++;
-  const ranksOn=RANKS.filter(r=>stops[r.id]).length;
-  const load=sounding*ranksOn*(stops.forte?1.3:1);
+  // the swell lid swings toward the knee lever rather than jumping
+  swellPos+=(swellS.value-swellPos)*Math.min(1,dt/.12);
+  const ranksOn={bass:0,treble:0};
+  HALVES.forEach(h=>{ranksOn[h]=RANKS.filter(r=>stops[h][r.id]).length;});
+  let sounding=0,reeds=0;
+  for(const v of voices.values())if(!v.released){sounding++;reeds+=ranksOn[v.half];}
+  const load=reeds*(1+.3*swellPos);
   const drain=.018+.021*load;
 
   let inflow=0;
@@ -758,18 +914,21 @@ function frame(now){
   const help=+helperEl.value/100*HELPER_MAX;
   inflow+=help*Math.max(0,Math.min(1,(.8-pressure)/.12));  // helper eases off near full
 
-  pressure+=(inflow-drain)*dt;
+  pressure+=(inflow-drain)*dt/resS.value;        // a bigger reservoir changes more slowly
   if(pressure>1){pressure=1;reliefT=.7;}
   pressure=Math.max(0,pressure);reliefT=Math.max(0,reliefT-dt);
 
-  const cents=(pressure-.55)*10;
+  // wind sensitivity scales how far pitch and brightness move away from a mid-gauge reading
+  const sens=sensS.value/10, P_REF=.55;
+  const cents=(pressure-P_REF)*sensS.value;
   if(ctx){
     const t=ctx.currentTime,p=pressure;
     const speak=p<.04?0:Math.min(1,(p-.04)/.12);
-    windGain.gain.setTargetAtTime(speak*windLevel(p)*1.7*(stops.forte?1.25:1),t,.03);
-    swell.frequency.setTargetAtTime(450+4200*Math.pow(windBright(p),1.4)*(stops.forte?1.7:1),t,.04);
+    const bRef=windBright(P_REF),bright=Math.max(0,bRef+(windBright(p)-bRef)*sens);
+    windGain.gain.setTargetAtTime(speak*windLevel(p)*1.7*(1+.25*swellPos),t,.03);
+    swell.frequency.setTargetAtTime(450+4200*Math.pow(bright,1.4)*(1+.7*swellPos),t,.04);
     windPitch.offset.setTargetAtTime(cents,t,.05);
-    noiseGain.gain.setTargetAtTime(.025*p*Math.min(1,sounding/3),t,.05);
+    noiseGain.gain.setTargetAtTime(.025*p*Math.min(1,sounding/3)*breathS.value,t,.05);
   }
   needle.setAttribute('transform',`rotate(${(-90+180*pressure*.9).toFixed(1)} 100 112)`);
   for(const P of [ped.L,ped.R]){
@@ -782,7 +941,7 @@ function frame(now){
   if(uiT>.1){uiT=0;
     rWind.textContent=(pressure*GMAX*.9).toFixed(1)+'″';
     const c=Math.round(cents);rPitch.textContent=(c>0?'+':c<0?'−':'')+Math.abs(c)+' ¢';
-    rReeds.textContent=sounding*ranksOn;
+    rReeds.textContent=reeds;
     rUse.textContent=drain.toFixed(2)+'/s';
     for(const P of [ped.L,ped.R]){
       P.flowEl.textContent=P.stage==='idle'?'idle':({a:'attack',d:'decay',s:'sustain',r:'release'}[P.stage])+' · '+(P.lvl*PEAK_FLOW*P.boost).toFixed(2)+'/s';
