@@ -1,0 +1,805 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="A playable foot-pumped reed organ for the web browser, with draw stops, treadle wind envelopes, cabinet and room reverb, and MIDI input.">
+<title>Parlor Reed Organ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IM+Fell+English+SC&family=IM+Fell+English:ital@0;1&family=Alegreya:ital,wght@0,400;0,500;1,400&display=swap">
+<style>
+html{-webkit-text-size-adjust:100%}
+body{margin:0}
+[hidden]{display:none!important}
+/* Layout: one walnut cabinet read top to bottom like the instrument itself:
+   name board → stop rail → wind gauge + controls → keys → treadles with their envelopes → listening notes.
+   Deliberately single-theme (a dark wood cabinet looks the same in any room). */
+:root{
+  --wood-deep:#1c110b;
+  --wood:#3a2116;
+  --wood-hi:#5b3622;
+  --rail:#2a1810;
+  --ivory:#eee3c6;
+  --ivory-shade:#cdbd96;
+  --ebony:#15100c;
+  --brass:#c9a052;
+  --brass-dim:#7d6230;
+  --carpet:#782030;
+  --carpet-hi:#a13a4a;
+  --text:#ebdcbc;
+  --muted:#b5a07e;
+  --warn:#e58a5a;
+  --good:#a9c48a;
+  --f-display:"IM Fell English SC","Iowan Old Style",Georgia,serif;
+  --f-label:"IM Fell English","Iowan Old Style",Georgia,serif;
+  --f-body:"Alegreya",Georgia,"Times New Roman",serif;
+  color-scheme:dark;
+}
+html,body{background:var(--wood-deep)}
+body{
+  color:var(--text);font-family:var(--f-body);font-size:16px;line-height:1.5;
+  padding-left:max(16px,env(safe-area-inset-left,0px));
+  padding-right:max(16px,env(safe-area-inset-right,0px));
+  padding-block:24px 48px;
+}
+*{box-sizing:border-box}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--brass);outline-offset:3px}
+
+.cabinet{
+  max-width:1000px;margin:0 auto;border-radius:14px 14px 6px 6px;
+  background:
+    repeating-linear-gradient(91deg,rgba(255,220,180,.025) 0 2px,transparent 2px 11px),
+    repeating-linear-gradient(89deg,rgba(0,0,0,.08) 0 1px,transparent 1px 23px),
+    linear-gradient(180deg,var(--wood-hi),var(--wood) 30%,var(--wood) 80%,#2c1910);
+  box-shadow:0 30px 60px -20px #000,inset 0 1px 0 rgba(255,220,170,.15);
+  padding:clamp(16px,3vw,32px);
+  display:flex;flex-direction:column;gap:clamp(18px,3vw,28px);
+}
+
+/* Name board */
+.nameboard{display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center}
+.plate{
+  font-family:var(--f-display);font-size:clamp(28px,5vw,46px);letter-spacing:.04em;line-height:1.05;
+  color:var(--brass);text-shadow:0 1px 0 #000,0 -1px 0 rgba(255,230,170,.18);
+  text-wrap:balance;margin:0;font-weight:400;
+}
+.subplate{font-family:var(--f-label);font-style:italic;color:var(--muted);font-size:15px;margin:0}
+.fret{width:min(320px,70%);height:10px;opacity:.7}
+
+/* Recessed rails (stops, envelopes) */
+.rail{
+  background:linear-gradient(180deg,#1f120b,var(--rail));border-radius:8px;
+  box-shadow:inset 0 2px 6px #000,0 1px 0 rgba(255,220,170,.08);
+  padding:14px 12px 16px;
+}
+.rail-label{font-family:var(--f-label);font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin:0 0 10px 4px}
+.stops{display:flex;flex-wrap:wrap;justify-content:center;gap:12px 14px}
+.stop{
+  width:78px;height:78px;border-radius:50%;border:0;cursor:pointer;padding:6px;
+  background:radial-gradient(circle at 40% 35%,#fbf4e0,var(--ivory) 45%,var(--ivory-shade));
+  color:#2b1a10;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;
+  box-shadow:0 0 0 3px var(--brass-dim),0 0 0 5px #120a06,inset 0 -3px 6px rgba(0,0,0,.25);
+  transform:translateY(2px) scale(.96);filter:brightness(.78) saturate(.8);
+  transition:transform .15s ease,filter .15s ease,box-shadow .15s ease;
+}
+.stop .nm{font-family:var(--f-display);font-size:13px;line-height:1.05;text-align:center}
+.stop .ft{font-family:var(--f-label);font-style:italic;font-size:12px;color:#5b3d26}
+.stop[aria-pressed="true"]{
+  transform:translateY(-3px) scale(1.03);filter:none;
+  box-shadow:0 0 0 3px var(--brass),0 0 0 5px #120a06,0 8px 14px -4px #000,inset 0 -3px 6px rgba(0,0,0,.2);
+}
+.stop.fx .nm{color:#5a1b25}
+.vox-ctl{display:flex;flex-direction:column;gap:4px;max-width:360px;margin:16px auto 0;padding:0 4px}
+.vox-ctl label{font-family:var(--f-label);font-size:15px}
+.vox-ctl output{font-variant-numeric:tabular-nums;color:var(--text);font-size:14px}
+
+/* Console: gauge + controls */
+.console{display:flex;flex-wrap:wrap;gap:18px 32px;align-items:center;justify-content:space-between}
+.gauge-wrap{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.gauge{width:180px;max-width:100%;height:auto;display:block}
+.readouts{display:grid;grid-template-columns:auto auto;gap:2px 12px;font-family:var(--f-label);font-size:14px;color:var(--muted);align-items:baseline}
+.readouts b{font-family:var(--f-body);font-weight:500;color:var(--text);font-variant-numeric:tabular-nums;font-size:16px;text-align:right}
+.status{grid-column:1 / -1;min-height:1.4em;color:var(--warn);font-style:italic;font-size:14px}
+.status.ok{color:var(--muted)}
+.ctrls{display:flex;flex-direction:column;gap:12px;font-size:15px;flex:1 1 300px;max-width:420px;min-width:0}
+.field{display:flex;flex-direction:column;gap:4px}
+.field-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
+.field-head label{font-family:var(--f-label);font-size:15px}
+.field-head output{font-variant-numeric:tabular-nums;color:var(--text);font-size:14px}
+.sub{color:var(--muted);font-size:13px;margin:0;font-style:italic}
+input[type=range]{width:100%;accent-color:var(--brass);margin:0}
+input[type=checkbox]{accent-color:var(--brass);width:17px;height:17px;margin:0}
+.check{display:flex;gap:10px;align-items:center;cursor:pointer;font-size:14px;color:var(--muted)}
+.midi-row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.btn{
+  border:1px solid var(--brass-dim);background:linear-gradient(180deg,#4a2c1c,#2e1a10);border-radius:6px;
+  padding:6px 14px;cursor:pointer;font-family:var(--f-label);font-size:15px;color:var(--text);
+  box-shadow:inset 0 1px 0 rgba(255,220,170,.12);
+}
+.btn:hover{border-color:var(--brass)}
+.midi-status{font-size:13px;color:var(--muted);font-style:italic;margin:0;min-width:0}
+.midi-status.on{color:var(--good);font-style:normal}
+.midi-status.bad{color:var(--warn)}
+.hint{color:var(--muted);font-size:14px;margin:0}
+kbd{font-family:var(--f-body);font-size:13px;border:1px solid var(--brass-dim);border-bottom-width:2px;border-radius:4px;padding:0 5px;color:var(--text);background:rgba(0,0,0,.25)}
+
+/* Keyboard */
+.keybed{
+  background:linear-gradient(180deg,#140b07,#24140d);border-radius:6px;padding:10px 8px 14px;
+  box-shadow:inset 0 3px 8px #000;
+}
+.keys{position:relative;display:flex;height:clamp(150px,22vw,200px);touch-action:none;user-select:none;-webkit-user-select:none}
+.white{
+  flex:1 1 0;min-width:0;position:relative;
+  background:linear-gradient(180deg,#f6eed8,var(--ivory) 70%,#e2d4b0);
+  border:1px solid #6b5536;border-top:0;border-radius:0 0 5px 5px;margin:0 1px 0 0;
+  box-shadow:inset 0 -6px 0 #d5c49c,0 2px 2px rgba(0,0,0,.4);
+  display:flex;align-items:flex-end;justify-content:center;padding-bottom:10px;
+}
+.black{
+  position:absolute;top:0;height:60%;z-index:2;border-radius:0 0 4px 4px;
+  background:linear-gradient(180deg,#2c221b,var(--ebony) 30%,#060403);
+  box-shadow:inset 0 -5px 0 #33271f,0 3px 4px rgba(0,0,0,.6);
+  display:flex;align-items:flex-end;justify-content:center;padding-bottom:7px;
+}
+.key .lbl{font-family:var(--f-label);font-size:11px;color:#8a7350;pointer-events:none;text-transform:uppercase}
+.black .lbl{color:#7a6650}
+.white.down{background:linear-gradient(180deg,#e6dbbd,#ddd0ab);box-shadow:inset 0 -2px 0 #c7b68c;transform:translateY(2px)}
+.black.down{box-shadow:inset 0 -1px 0 #33271f;transform:translateY(2px);background:linear-gradient(180deg,#221a14,#0a0705)}
+
+/* Treadles + envelopes */
+.feet-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;margin:0 0 4px}
+.feet-head h2{font-family:var(--f-display);font-weight:400;font-size:20px;color:var(--brass);margin:0;letter-spacing:.03em}
+.feet{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.foot{display:flex;flex-direction:column;gap:14px;align-items:stretch;min-width:0}
+.treadle{
+  align-self:center;width:min(190px,100%);height:96px;border:0;cursor:pointer;border-radius:10px;padding:10px;
+  background:linear-gradient(180deg,#4a2b1b,#2b170e);
+  box-shadow:0 8px 0 #160c07,0 12px 16px -6px #000;
+  transform-origin:50% 0;touch-action:none;
+}
+.treadle .carpet{
+  display:flex;align-items:center;justify-content:center;height:100%;border-radius:5px;
+  background:
+    radial-gradient(circle at 50% 50%,rgba(240,200,120,.35) 0 3px,transparent 4px) 0 0/18px 18px,
+    radial-gradient(circle at 50% 50%,rgba(20,0,0,.35) 0 6px,transparent 7px) 9px 9px/18px 18px,
+    linear-gradient(180deg,var(--carpet-hi),var(--carpet));
+  border:2px solid #1a0c06;font-family:var(--f-display);font-size:14px;color:#f3dcc0;text-shadow:0 1px 2px #000;
+}
+.env{display:flex;flex-direction:column;gap:10px}
+.env-top{display:flex;justify-content:space-between;align-items:baseline}
+.env-top .rail-label{margin:0}
+.env-flow{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.env svg{width:100%;height:auto;display:block}
+.env-grid{display:grid;grid-template-columns:auto 1fr auto;gap:6px 10px;align-items:center}
+.env-grid label{font-family:var(--f-label);font-size:14px}
+.env-grid output{font-variant-numeric:tabular-nums;font-size:13px;color:var(--text);min-width:5.2ch;text-align:right}
+
+/* Notes */
+.notes{max-width:1000px;margin:28px auto 0;display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:18px 28px}
+.notes h2{grid-column:1 / -1;font-family:var(--f-display);font-weight:400;color:var(--brass);font-size:22px;margin:0;letter-spacing:.03em}
+.notes div{min-width:0}
+.notes h3{font-family:var(--f-label);font-style:italic;font-weight:400;font-size:17px;margin:0 0 2px;color:var(--text)}
+.notes p{margin:0;color:var(--muted);font-size:15px;max-width:60ch}
+
+@media (max-width:640px){
+  .feet{grid-template-columns:1fr}
+}
+@media (max-width:560px){
+  .stop{width:66px;height:66px}
+  .stop .nm{font-size:11.5px}
+  .stop .ft{font-size:11px}
+  .treadle{height:84px}
+}
+@media (prefers-reduced-motion:reduce){
+  .stop,.white,.black{transition:none}
+}
+</style>
+</head>
+<body>
+<div class="cabinet">
+  <header class="nameboard">
+    <svg class="fret" viewBox="0 0 320 10" aria-hidden="true"><path d="M0 5 H130 M190 5 H320" stroke="#c9a052" stroke-width="1"/><path d="M140 5 l10 -4 l10 4 l10 -4 l10 4 l-10 4 l-10 -4 l-10 4 z" fill="none" stroke="#c9a052" stroke-width="1"/></svg>
+    <h1 class="plate">Parlor Reed Organ</h1>
+    <p class="subplate">Five sets of free reeds · foot-pumped wind · fan tremolo</p>
+  </header>
+
+  <section class="rail" aria-label="Stops">
+    <p class="rail-label">Draw stops</p>
+    <div class="stops" id="stops"></div>
+    <div class="vox-ctl">
+      <div class="field-head"><label for="voxRate">Vox Humana fan speed</label><output id="voxOut" for="voxRate">5.6 Hz</output></div>
+      <input type="range" id="voxRate" min="1" max="12" step="0.1" value="5.6">
+    </div>
+  </section>
+
+  <section class="console">
+    <div class="gauge-wrap">
+      <svg class="gauge" id="gauge" viewBox="0 0 200 122" role="img" aria-label="Wind pressure gauge">
+        <defs>
+          <radialGradient id="dial" cx="50%" cy="85%" r="85%"><stop offset="0" stop-color="#f3e8cc"/><stop offset="1" stop-color="#cdbb92"/></radialGradient>
+        </defs>
+        <path d="M10 112 A90 90 0 0 1 190 112 Z" fill="url(#dial)" stroke="#c9a052" stroke-width="4"/>
+        <path id="redzone" fill="none" stroke="#a13a4a" stroke-width="6"/>
+        <g id="ticks"></g>
+        <text x="100" y="86" text-anchor="middle" font-family="IM Fell English, Georgia, serif" font-style="italic" font-size="11" fill="#5b3d26">in. water</text>
+        <line id="needle" x1="100" y1="112" x2="100" y2="34" stroke="#2a1a10" stroke-width="2.5" stroke-linecap="round"/>
+        <circle cx="100" cy="112" r="7" fill="#c9a052" stroke="#2a1a10" stroke-width="1.5"/>
+      </svg>
+      <div class="readouts" aria-live="off">
+        <span>Wind</span><b id="rWind">2.0″</b>
+        <span>Pitch</span><b id="rPitch">0 ¢</b>
+        <span>Reeds</span><b id="rReeds">0</b>
+        <span>Use</span><b id="rUse">0.02/s</b>
+        <span class="status ok" id="status">Press a key to start</span>
+      </div>
+    </div>
+
+    <div class="ctrls">
+      <div class="field">
+        <div class="field-head"><label for="helper">Helper pump</label><output id="helperOut" for="helper">Off</output></div>
+        <input type="range" id="helper" min="0" max="100" step="1" value="0">
+        <p class="sub" id="helperSub">An invisible assistant pumps at a steady rate. Below what you're playing, the wind slowly runs out.</p>
+      </div>
+      <div class="field">
+        <div class="field-head"><label for="cabAmt">Cabinet</label><output id="cabOut" for="cabAmt">45%</output></div>
+        <input type="range" id="cabAmt" min="0" max="100" step="1" value="45">
+      </div>
+      <div class="field">
+        <div class="field-head"><label for="roomAmt">Room</label><output id="roomOut" for="roomAmt">30%</output></div>
+        <input type="range" id="roomAmt" min="0" max="100" step="1" value="30">
+      </div>
+      <div class="field">
+        <div class="field-head"><label for="thumpAmt">Treadle noise</label><output id="thumpOut" for="thumpAmt">60%</output></div>
+        <input type="range" id="thumpAmt" min="0" max="100" step="1" value="60">
+      </div>
+      <div class="field">
+        <div class="midi-row">
+          <button class="btn" id="midiBtn" type="button">Connect MIDI keyboard</button>
+          <p class="midi-status" id="midiStatus">Not connected</p>
+        </div>
+      </div>
+      <p class="hint">Hold <kbd>←</kbd> <kbd>→</kbd> (or <kbd>Space</kbd>) to work the treadles. Play with <kbd>Z</kbd>–<kbd>M</kbd> for the low octave and <kbd>Q</kbd>–<kbd>U</kbd> and up for the middle.</p>
+    </div>
+  </section>
+
+  <section class="keybed" aria-label="Keyboard">
+    <div class="keys" id="keys"></div>
+  </section>
+
+  <section aria-label="Treadles">
+    <div class="feet-head">
+      <h2>Treadles</h2>
+      <label class="check" for="link"><input type="checkbox" id="link" checked> Same envelope for both feet</label>
+    </div>
+    <p class="sub" style="margin:0 0 14px">Each treadle feeds air through its own envelope. Pressing starts the attack; holding keeps the sustain flowing; letting go starts the release. Times run up to 30 seconds.</p>
+    <div class="feet" id="feet"></div>
+  </section>
+</div>
+
+<section class="notes">
+  <h2>Things to listen for</h2>
+  <div><h3>Let the wind run out</h3><p>Set the helper low, hold a chord and stop pumping. The sound gets quieter, then darker, and sags a few cents flat before the reeds stop speaking.</p></div>
+  <div><h3>Pump harder</h3><p>Strong, alternating strokes push the reeds harder. They get brighter and buzzier, and the pitch creeps sharp. Push too hard and the relief valve vents.</p></div>
+  <div><h3>Slow-motion feet</h3><p>Give a treadle a long attack and release. The organ swells in and fades away on its own, like a very patient player.</p></div>
+  <div><h3>The shimmer</h3><p>Draw Celeste with Diapason. The Celeste reeds are tuned 7 cents sharp, so the two ranks beat against each other in a slow wave.</p></div>
+  <div><h3>Vox Humana and Forte</h3><p>Vox Humana spins a little fan for a wavering tremolo. Forte opens the swell lid: louder and brighter, but it drinks wind faster.</p></div>
+</section>
+
+<script>
+(()=>{
+const RANKS=[
+  {id:'bourdon',  nm:'Bourdon',  ft:'16′', mult:.5, wave:'mellow', det:0,  level:.85},
+  {id:'diapason', nm:'Diapason', ft:'8′',  mult:1,  wave:'reed',   det:0,  level:1},
+  {id:'melodia',  nm:'Melodia',  ft:'8′',  mult:1,  wave:'mellow', det:-2, level:.9},
+  {id:'celeste',  nm:'Celeste',  ft:'8′',  mult:1,  wave:'reed',   det:7,  level:.75},
+  {id:'principal',nm:'Principal',ft:'4′',  mult:2,  wave:'thin',   det:1,  level:.5},
+];
+const FX=[{id:'vox',nm:'Vox Humana',ft:'tremolo'},{id:'forte',nm:'Forte',ft:'swell'}];
+const stops={diapason:true,melodia:true};
+const reduceMotion=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+const store={get(k,d){try{const v=localStorage.getItem('reed-'+k);return v==null?d:JSON.parse(v);}catch(e){return d;}},
+             set(k,v){try{localStorage.setItem('reed-'+k,JSON.stringify(v));}catch(e){}}};
+
+let pressure=.5, lastSide=null, reliefT=0, started=false;
+let ctx=null, waves, buses=[], swell, windGain, trem, lfo, lfoAmp, lfoFilt, windPitch, noiseGain;
+let cabDry, cabWet, roomWet;
+
+/* Cabinet, room and treadle-noise levels */
+const mix={cab:store.get('cab',45),room:store.get('room',30),thump:store.get('thump',60)};
+[['cab','cabAmt','cabOut'],['room','roomAmt','roomOut'],['thump','thumpAmt','thumpOut']].forEach(([k,id,oid])=>{
+  const el=document.getElementById(id),out=document.getElementById(oid);
+  el.value=mix[k];out.textContent=mix[k]===0?'Off':mix[k]+'%';
+  el.addEventListener('input',()=>{
+    mix[k]=+el.value;out.textContent=mix[k]===0?'Off':mix[k]+'%';
+    store.set(k,mix[k]);applyMix();
+  });
+});
+function applyMix(){
+  if(!ctx)return;const t=ctx.currentTime,c=mix.cab/100,r=mix.room/100;
+  cabWet.gain.setTargetAtTime(c*1.1,t,.05);
+  cabDry.gain.setTargetAtTime(1-c*.45,t,.05);
+  roomWet.gain.setTargetAtTime(r*.7,t,.05);
+}
+
+/* Vox Humana fan speed */
+const voxEl=document.getElementById('voxRate'),voxOut=document.getElementById('voxOut');
+voxEl.value=store.get('voxRate',5.6);
+const syncVox=()=>{voxOut.textContent=(+voxEl.value).toFixed(1)+' Hz';};
+voxEl.addEventListener('input',()=>{
+  syncVox();store.set('voxRate',+voxEl.value);
+  if(lfo)lfo.frequency.setTargetAtTime(+voxEl.value,ctx.currentTime,.25); // the fan spins up and down gradually
+});
+syncVox();
+
+/* Wind → loudness. Rises normally up to about 2″ on the gauge, then a soft knee
+   flattens it so the reservoir's top end adds only a little more volume. */
+const KNEE=2/(4*.9);                   // pressure where the 4″ gauge reads 2″
+const HEAD=.09;                        // extra amplitude allowed above the knee
+function windLevel(p){
+  const base=x=>Math.pow(x,1.2);
+  if(p<=KNEE)return base(p);
+  const slope=1.2*Math.pow(KNEE,.2);
+  return base(KNEE)+HEAD*Math.tanh((p-KNEE)*slope/HEAD);
+}
+// brightness keeps climbing above the knee, but at half the rate
+const windBright=p=>p<=KNEE?p:KNEE+(p-KNEE)*.5;
+const voices=new Map();   // midi -> {refs, oscs, envs, released}
+
+/* ---------- stop rail ---------- */
+const stopsEl=document.getElementById('stops');
+[...RANKS,...FX].forEach(s=>{
+  const b=document.createElement('button');
+  b.className='stop'+(FX.includes(s)?' fx':'');
+  b.id='stop-'+s.id;b.type='button';
+  b.setAttribute('aria-pressed',stops[s.id]?'true':'false');
+  b.innerHTML=`<span class="nm">${s.nm}</span><span class="ft">${s.ft}</span>`;
+  b.addEventListener('click',()=>{stops[s.id]=!stops[s.id];b.setAttribute('aria-pressed',stops[s.id]);initAudio();applyStops();});
+  stopsEl.appendChild(b);
+});
+
+/* ---------- gauge ---------- */
+const GMAX=4;
+(function drawGauge(){
+  const g=document.getElementById('ticks');let s='';
+  for(let i=0;i<=GMAX*4;i++){
+    const v=i/4, a=Math.PI*(1-v/GMAX), major=i%4===0;
+    const r1=major?70:76, r2=84;
+    const x1=100+r1*Math.cos(a),y1=112-r1*Math.sin(a),x2=100+r2*Math.cos(a),y2=112-r2*Math.sin(a);
+    s+=`<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="#3a2416" stroke-width="${major?2:1}"/>`;
+    if(major){const xr=100+58*Math.cos(a),yr=112-58*Math.sin(a)+4;s+=`<text x="${xr.toFixed(1)}" y="${yr.toFixed(1)}" text-anchor="middle" font-family="IM Fell English SC, Georgia, serif" font-size="13" fill="#3a2416">${v}</text>`;}
+  }
+  g.innerHTML=s;
+  const a0=Math.PI*(1-3.6/GMAX);
+  document.getElementById('redzone').setAttribute('d',`M${(100+80*Math.cos(a0)).toFixed(1)} ${(112-80*Math.sin(a0)).toFixed(1)} A80 80 0 0 1 180 112`);
+})();
+const needle=document.getElementById('needle');
+
+/* ---------- keyboard ---------- */
+const KEYMAP={z:48,s:49,x:50,d:51,c:52,v:53,g:54,b:55,h:56,n:57,j:58,m:59,
+  q:60,'2':61,w:62,'3':63,e:64,r:65,'5':66,t:67,'6':68,y:69,'7':70,u:71,
+  i:72,'9':73,o:74,'0':75,p:76,'[':77,'=':78,']':79};
+const LABEL={};for(const k in KEYMAP)LABEL[KEYMAP[k]]=k;
+const keysEl=document.getElementById('keys');
+const isBlack=m=>[1,3,6,8,10].includes(m%12);
+let range=null;
+function buildKeys(){
+  const w=keysEl.clientWidth||window.innerWidth;
+  const r=w<620?[48,72]:[48,84];
+  if(range&&range[0]===r[0]&&range[1]===r[1])return;
+  range=r;keysEl.innerHTML='';
+  const whites=[];for(let m=r[0];m<=r[1];m++)if(!isBlack(m))whites.push(m);
+  const W=100/whites.length;
+  let wi=0;
+  for(let m=r[0];m<=r[1];m++){
+    const el=document.createElement('div');
+    el.dataset.midi=m;
+    const lbl=LABEL[m]&&w>=620?`<span class="lbl">${LABEL[m]}</span>`:'';
+    if(isBlack(m)){
+      el.className='key black';
+      const bw=W*.6;
+      el.style.left=`calc(${wi*W - bw/2}% - 0.5px)`;el.style.width=bw+'%';
+    }else{el.className='key white';wi++;}
+    el.innerHTML=lbl;
+    keysEl.appendChild(el);
+  }
+  for(const [m,v] of voices)if(!v.released)markKey(m,true);
+}
+function markKey(m,on){const el=keysEl.querySelector(`[data-midi="${m}"]`);if(el)el.classList.toggle('down',on);}
+buildKeys();
+new ResizeObserver(buildKeys).observe(keysEl);
+
+/* ---------- audio ---------- */
+function makeWave(fn,n){
+  const re=new Float32Array(n+1),im=new Float32Array(n+1);
+  for(let k=1;k<=n;k++)im[k]=fn(k);
+  return ctx.createPeriodicWave(re,im);
+}
+function impulse(sec,decay){
+  const len=Math.floor(ctx.sampleRate*sec),buf=ctx.createBuffer(2,len,ctx.sampleRate);
+  for(let c=0;c<2;c++){const d=buf.getChannelData(c);for(let i=0;i<len;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/len,decay);}
+  return buf;
+}
+/* A wooden case about 1.2 × 1.0 × 0.6 m: a cluster of very early reflections
+   between the panels, a short dense tail that the wood darkens, and a low
+   panel resonance that gives the box its hollow "body". */
+function cabinetIR(){
+  const sr=ctx.sampleRate,len=Math.floor(sr*.2),buf=ctx.createBuffer(2,len,sr);
+  const taps=[[.0017,.75],[.0029,.6],[.0035,.55],[.0046,.45],[.0052,.4],[.0064,.36],[.0071,.32],
+              [.0087,.27],[.0099,.24],[.0116,.2],[.0128,.17],[.0145,.14],[.0174,.11]];
+  for(let ch=0;ch<2;ch++){
+    const d=buf.getChannelData(ch),spread=ch?1.06:1;
+    d[0]=1;
+    taps.forEach(([t,a],i)=>{const idx=Math.floor(t*spread*sr);if(idx<len)d[idx]+=a*(i%3===2?-1:1);});
+    for(let i=0;i<len;i++){
+      const t=i/sr;
+      d[i]+=(Math.random()*2-1)*.28*Math.exp(-t/.032);                 // dense box tail
+      d[i]+=Math.sin(2*Math.PI*148*t)*.12*Math.exp(-t/.06)              // main panel mode
+           +Math.sin(2*Math.PI*310*t+1)*.06*Math.exp(-t/.04);           // second panel mode
+    }
+    let y=0;for(let i=0;i<len;i++){y+= .55*(d[i]-y);d[i]=y;}            // wood soaks up the highs
+  }
+  return buf;
+}
+function initAudio(){
+  if(ctx){if(ctx.state==='suspended')ctx.resume();return;}
+  const AC=window.AudioContext||window.webkitAudioContext;if(!AC)return;
+  ctx=new AC();
+  waves={
+    reed:  makeWave(k=>(k%2?1:.55)/Math.pow(k,.85),40),
+    mellow:makeWave(k=>(k%2?1:.3)/Math.pow(k,1.9),16),
+    thin:  makeWave(k=>(k%2?1:.7)/Math.pow(k,1.15),40)
+  };
+  swell=ctx.createBiquadFilter();swell.type='lowpass';swell.Q.value=.7;swell.frequency.value=2000;
+  windGain=ctx.createGain();windGain.gain.value=0;
+  trem=ctx.createGain();trem.gain.value=1;
+  lfo=ctx.createOscillator();lfo.frequency.value=+voxEl.value;
+  lfoAmp=ctx.createGain();lfoAmp.gain.value=0;
+  lfoFilt=ctx.createGain();lfoFilt.gain.value=0;
+  lfo.connect(lfoAmp).connect(trem.gain);lfo.connect(lfoFilt).connect(swell.detune);lfo.start();
+  const body1=ctx.createBiquadFilter();body1.type='peaking';body1.frequency.value=230;body1.Q.value=1;body1.gain.value=3;
+  const body2=ctx.createBiquadFilter();body2.type='peaking';body2.frequency.value=1100;body2.Q.value=1.4;body2.gain.value=2;
+  const shelf=ctx.createBiquadFilter();shelf.type='highshelf';shelf.frequency.value=6000;shelf.gain.value=-7;
+  const comp=ctx.createDynamicsCompressor();comp.threshold.value=-16;comp.ratio.value=4;comp.attack.value=.01;comp.release.value=.2;
+  const dry=ctx.createGain();dry.gain.value=.85;
+  const conv=ctx.createConvolver();conv.buffer=impulse(1.8,3);
+  roomWet=ctx.createGain();roomWet.gain.value=0;
+  const cabConv=ctx.createConvolver();cabConv.buffer=cabinetIR();
+  cabDry=ctx.createGain();cabDry.gain.value=1;
+  cabWet=ctx.createGain();cabWet.gain.value=0;
+  const cabSum=ctx.createGain();
+  const master=ctx.createGain();master.gain.value=.8;
+  RANKS.forEach((r,i)=>{const g=ctx.createGain();g.gain.value=stops[r.id]?r.level:0;g.connect(swell);buses[i]=g;});
+  swell.connect(windGain).connect(trem).connect(body1).connect(body2).connect(shelf);
+  // reeds → cabinet (dry + boxy reflections) → room (dry + long tail)
+  shelf.connect(cabDry).connect(cabSum);shelf.connect(cabConv).connect(cabWet).connect(cabSum);
+  cabSum.connect(dry).connect(comp);cabSum.connect(conv).connect(roomWet).connect(comp);
+  comp.connect(master).connect(ctx.destination);
+  windPitch=ctx.createConstantSource();windPitch.offset.value=0;windPitch.start();
+  const nb=ctx.createBuffer(1,ctx.sampleRate*2,ctx.sampleRate),nd=nb.getChannelData(0);
+  for(let i=0;i<nd.length;i++)nd[i]=Math.random()*2-1;
+  const ns=ctx.createBufferSource();ns.buffer=nb;ns.loop=true;
+  const bp=ctx.createBiquadFilter();bp.type='bandpass';bp.frequency.value=2600;bp.Q.value=.8;
+  noiseGain=ctx.createGain();noiseGain.gain.value=0;
+  ns.connect(bp).connect(noiseGain).connect(trem);ns.start();
+  applyStops();applyMix();
+}
+function applyStops(){
+  if(!ctx)return;const t=ctx.currentTime;
+  RANKS.forEach((r,i)=>buses[i].gain.setTargetAtTime(stops[r.id]?r.level:0,t,.04));
+  lfoAmp.gain.setTargetAtTime(stops.vox?.22:0,t,.15);
+  lfoFilt.gain.setTargetAtTime(stops.vox?120:0,t,.15);
+}
+const reedOffset=m=>(((m*9301+49297)%233280)/233280-.5)*3; // each old reed sits a little off
+function noteOn(m){
+  initAudio();if(!ctx||m<21||m>108)return;
+  started=true;
+  let v=voices.get(m);
+  if(v&&!v.released){v.refs++;return;}
+  if(v)killVoice(v,.01);
+  const t=ctx.currentTime,f=440*Math.pow(2,(m-69)/12);
+  const tc=.012+.06*(1-Math.min(1,pressure));     // low wind = slower speech
+  const amp=.11*Math.max(.55,1-(m-48)*.006);
+  v={refs:1,oscs:[],envs:[],released:false};
+  RANKS.forEach((r,i)=>{
+    const o=ctx.createOscillator();o.setPeriodicWave(waves[r.wave]);
+    o.frequency.value=f*r.mult;
+    const base=r.det+reedOffset(m+i*7);
+    o.detune.setValueAtTime(base-16,t);o.detune.setTargetAtTime(base,t,.04);
+    windPitch.connect(o.detune);
+    const g=ctx.createGain();g.gain.setValueAtTime(0,t);g.gain.setTargetAtTime(amp,t,tc);
+    o.connect(g).connect(buses[i]);o.start(t);
+    o.onended=()=>{try{windPitch.disconnect(o.detune);}catch(e){}g.disconnect();};
+    v.oscs.push(o);v.envs.push(g);
+  });
+  voices.set(m,v);markKey(m,true);
+}
+function killVoice(v,tc){
+  const t=ctx.currentTime;v.released=true;
+  v.envs.forEach(g=>{g.gain.cancelScheduledValues(t);g.gain.setTargetAtTime(0,t,tc);});
+  v.oscs.forEach(o=>{try{o.stop(t+tc*10);}catch(e){}});
+}
+function noteOff(m){
+  const v=voices.get(m);if(!v||v.released)return;
+  if(--v.refs>0)return;
+  killVoice(v,.05);markKey(m,false);
+  setTimeout(()=>{if(voices.get(m)===v)voices.delete(m);},600);
+}
+
+/* ---------- treadle envelopes ---------- */
+const PEAK_FLOW=1.2;          // reservoir units per second at full stroke
+const TMIN=.005,TMAX=30;
+const toTime=x=>TMIN*Math.pow(TMAX/TMIN,x/1000);
+const toSlider=t=>Math.round(1000*Math.log(t/TMIN)/Math.log(TMAX/TMIN));
+const fmtT=t=>t<1?Math.round(t*1000)+' ms':t<10?t.toFixed(2)+' s':t.toFixed(1)+' s';
+const DEFAULT_ENV={a:.06,d:.3,s:0,r:.15};
+const ped={
+  L:{side:'L',name:'Left',gate:false,stage:'idle',lvl:0,relFrom:0,boost:1,p:{...DEFAULT_ENV,...store.get('envL',{})}},
+  R:{side:'R',name:'Right',gate:false,stage:'idle',lvl:0,relFrom:0,boost:1,p:{...DEFAULT_ENV,...store.get('envR',{})}}
+};
+const linkEl=document.getElementById('link');
+linkEl.checked=store.get('link',true);
+const feetEl=document.getElementById('feet');
+
+function buildFoot(P){
+  const s=P.side;
+  const wrap=document.createElement('div');wrap.className='foot';
+  wrap.innerHTML=`
+    <button class="treadle" id="t${s}" type="button" aria-label="${P.name} treadle, hold to pump"><span class="carpet">${P.name}</span></button>
+    <div class="rail env">
+      <div class="env-top"><p class="rail-label">${P.name} foot</p><span class="env-flow" id="flow${s}">idle</span></div>
+      <svg viewBox="0 0 220 64" aria-hidden="true">
+        <line x1="4" y1="58" x2="216" y2="58" stroke="#5a4028" stroke-width="1"/>
+        <polyline id="shape${s}" fill="rgba(201,160,82,.14)" stroke="#c9a052" stroke-width="1.6" stroke-linejoin="round"/>
+        <circle id="dot${s}" r="4" fill="#eee3c6" stroke="#1c110b" stroke-width="1.5" cx="4" cy="58" opacity="0"/>
+      </svg>
+      <div class="env-grid">
+        <label for="a${s}">Attack</label><input type="range" id="a${s}" min="0" max="1000"><output id="ao${s}"></output>
+        <label for="d${s}">Decay</label><input type="range" id="d${s}" min="0" max="1000"><output id="do${s}"></output>
+        <label for="s${s}">Sustain</label><input type="range" id="s${s}" min="0" max="100"><output id="so${s}"></output>
+        <label for="r${s}">Release</label><input type="range" id="r${s}" min="0" max="1000"><output id="ro${s}"></output>
+      </div>
+    </div>`;
+  feetEl.appendChild(wrap);
+  P.el=wrap.querySelector('.treadle');
+  P.shape=wrap.querySelector('#shape'+s);P.dot=wrap.querySelector('#dot'+s);P.flowEl=wrap.querySelector('#flow'+s);
+  P.inputs={a:wrap.querySelector('#a'+s),d:wrap.querySelector('#d'+s),s:wrap.querySelector('#s'+s),r:wrap.querySelector('#r'+s)};
+  P.outs={a:wrap.querySelector('#ao'+s),d:wrap.querySelector('#do'+s),s:wrap.querySelector('#so'+s),r:wrap.querySelector('#ro'+s)};
+  ['a','d','r'].forEach(k=>P.inputs[k].addEventListener('input',()=>setParam(P,k,toTime(+P.inputs[k].value))));
+  P.inputs.s.addEventListener('input',()=>setParam(P,'s',+P.inputs.s.value/100));
+  P.el.addEventListener('pointerdown',e=>{e.preventDefault();try{P.el.setPointerCapture(e.pointerId);}catch(_){}gateOn(P);});
+  const up=()=>gateOff(P);
+  P.el.addEventListener('pointerup',up);P.el.addEventListener('pointercancel',up);P.el.addEventListener('lostpointercapture',up);
+  P.el.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();e.stopPropagation();if(!e.repeat)gateOn(P);}});
+  P.el.addEventListener('keyup',e=>{if(e.key==='Enter'){e.stopPropagation();gateOff(P);}});
+  syncUI(P);
+}
+function setParam(P,k,v){
+  P.p[k]=v;store.set('env'+P.side,P.p);
+  if(linkEl.checked){const O=P.side==='L'?ped.R:ped.L;O.p[k]=v;store.set('env'+O.side,O.p);syncUI(O);}
+  syncUI(P);
+}
+function syncUI(P){
+  ['a','d','r'].forEach(k=>{P.inputs[k].value=toSlider(P.p[k]);P.outs[k].textContent=fmtT(P.p[k]);});
+  P.inputs.s.value=Math.round(P.p.s*100);P.outs.s.textContent=Math.round(P.p.s*100)+'%';
+  drawShape(P);
+}
+linkEl.addEventListener('change',()=>{
+  store.set('link',linkEl.checked);
+  if(linkEl.checked){ped.R.p={...ped.L.p};store.set('envR',ped.R.p);syncUI(ped.R);}
+});
+// envelope picture: segment widths on a log-ish scale so 5 ms and 30 s both read
+const segW=t=>8+46*Math.log10(1+t*20)/Math.log10(1+TMAX*20);
+function geom(P){
+  const wa=segW(P.p.a),wd=segW(P.p.d),ws=36,wr=segW(P.p.r);
+  const total=wa+wd+ws+wr,k=212/total;
+  const x0=4,xa=x0+wa*k,xd=xa+wd*k,xs=xd+ws*k,xr=xs+wr*k;
+  const y=l=>58-50*l;
+  return {x0,xa,xd,xs,xr,y};
+}
+function drawShape(P){
+  const g=geom(P),ys=g.y(P.p.s);
+  P.shape.setAttribute('points',`${g.x0},58 ${g.xa.toFixed(1)},8 ${g.xd.toFixed(1)},${ys.toFixed(1)} ${g.xs.toFixed(1)},${ys.toFixed(1)} ${g.xr.toFixed(1)},58`);
+}
+function placeDot(P){
+  if(P.stage==='idle'){P.dot.setAttribute('opacity','0');return;}
+  const g=geom(P),s=P.p.s;let x;
+  if(P.stage==='a')x=g.x0+(g.xa-g.x0)*P.lvl;
+  else if(P.stage==='d')x=g.xa+(g.xd-g.xa)*(s>=1?1:Math.min(1,(1-P.lvl)/(1-s)));
+  else if(P.stage==='s')x=(g.xd+g.xs)/2;
+  else x=g.xs+(g.xr-g.xs)*(P.relFrom>0?1-P.lvl/P.relFrom:1);
+  P.dot.setAttribute('cx',x.toFixed(1));P.dot.setAttribute('cy',g.y(P.lvl).toFixed(1));P.dot.setAttribute('opacity','1');
+}
+function gateOn(P){
+  initAudio();
+  if(P.gate)return;
+  P.gate=true;
+  P.boost=P.side!==lastSide?1:.45;   // alternating feet fills the feeders better
+  lastSide=P.side;
+  P.stage='a';
+  if(ctx&&mix.thump>0){ // soft thump of the treadle hinge
+    const t=ctx.currentTime,o=ctx.createOscillator(),g=ctx.createGain();
+    o.frequency.setValueAtTime(90,t);o.frequency.exponentialRampToValueAtTime(45,t+.08);
+    g.gain.setValueAtTime(.085*mix.thump/100,t);g.gain.exponentialRampToValueAtTime(.0001,t+.1);
+    o.connect(g).connect(ctx.destination);o.start(t);o.stop(t+.12);
+  }
+}
+function gateOff(P){
+  if(!P.gate)return;
+  P.gate=false;
+  if(P.lvl>0){P.stage='r';P.relFrom=P.lvl;}else P.stage='idle';
+}
+function stepEnv(P,dt){
+  const {a,d,s,r}=P.p;
+  if(P.stage==='a'){P.lvl+=dt/a;if(P.lvl>=1){P.lvl=1;P.stage='d';}}
+  else if(P.stage==='d'){
+    if(s>=1){P.lvl=1;P.stage='s';}
+    else{P.lvl-=dt*(1-s)/d;if(P.lvl<=s){P.lvl=s;P.stage='s';}}
+  }
+  else if(P.stage==='s'){P.lvl=s;}
+  else if(P.stage==='r'){P.lvl-=dt*P.relFrom/r;if(P.lvl<=0){P.lvl=0;P.stage='idle';}}
+}
+buildFoot(ped.L);buildFoot(ped.R);
+
+/* ---------- helper pump ---------- */
+const helperEl=document.getElementById('helper'),helperOut=document.getElementById('helperOut');
+helperEl.value=store.get('helper',0);
+const HELPER_MAX=.6; // at 100% it can feed full organ
+const syncHelper=()=>{const v=+helperEl.value;helperOut.textContent=v===0?'Off':v+'% · '+(v/100*HELPER_MAX).toFixed(2)+'/s';};
+helperEl.addEventListener('input',()=>{initAudio();store.set('helper',+helperEl.value);syncHelper();});
+syncHelper();
+
+/* ---------- pointer + computer keyboard ---------- */
+const ptrs=new Map();
+keysEl.addEventListener('pointerdown',e=>{
+  const k=e.target.closest('.key');if(!k)return;
+  e.preventDefault();keysEl.setPointerCapture(e.pointerId);
+  const m=+k.dataset.midi;ptrs.set(e.pointerId,m);noteOn(m);
+});
+keysEl.addEventListener('pointermove',e=>{
+  if(!ptrs.has(e.pointerId))return;
+  const el=document.elementFromPoint(e.clientX,e.clientY);
+  const k=el&&el.closest?el.closest('.key'):null;
+  const m=k&&keysEl.contains(k)?+k.dataset.midi:null,cur=ptrs.get(e.pointerId);
+  if(m!==cur){if(cur!=null)noteOff(cur);if(m!=null)noteOn(m);ptrs.set(e.pointerId,m);}
+});
+const endPtr=e=>{if(!ptrs.has(e.pointerId))return;const m=ptrs.get(e.pointerId);if(m!=null)noteOff(m);ptrs.delete(e.pointerId);};
+keysEl.addEventListener('pointerup',endPtr);keysEl.addEventListener('pointercancel',endPtr);
+
+const kbHeld=new Set();let spaceSide=null;
+window.addEventListener('keydown',e=>{
+  if(e.metaKey||e.ctrlKey||e.altKey)return;
+  const tag=e.target.tagName;
+  if(tag==='INPUT'&&(e.key.startsWith('Arrow')||e.key===' '))return; // let sliders use arrows
+  if(e.key==='ArrowLeft'||e.key==='ArrowRight'){e.preventDefault();if(!e.repeat)gateOn(e.key==='ArrowLeft'?ped.L:ped.R);return;}
+  if(e.key===' '){
+    if(tag==='BUTTON')return;
+    e.preventDefault();if(e.repeat||spaceSide)return;
+    spaceSide=lastSide==='L'?'R':'L';gateOn(ped[spaceSide]);return;
+  }
+  const k=e.key.toLowerCase();
+  if(k in KEYMAP){e.preventDefault();if(e.repeat||kbHeld.has(k))return;kbHeld.add(k);noteOn(KEYMAP[k]);}
+});
+window.addEventListener('keyup',e=>{
+  if(e.key==='ArrowLeft')gateOff(ped.L);
+  else if(e.key==='ArrowRight')gateOff(ped.R);
+  else if(e.key===' '&&spaceSide){gateOff(ped[spaceSide]);spaceSide=null;}
+  const k=e.key.toLowerCase();if(kbHeld.has(k)){kbHeld.delete(k);noteOff(KEYMAP[k]);}
+});
+window.addEventListener('blur',()=>{
+  kbHeld.forEach(k=>noteOff(KEYMAP[k]));kbHeld.clear();
+  gateOff(ped.L);gateOff(ped.R);spaceSide=null;
+});
+
+/* ---------- MIDI input ---------- */
+const midiBtn=document.getElementById('midiBtn'),midiStatus=document.getElementById('midiStatus');
+let midiAccess=null,sustain=false;
+const midiHeld=new Set(),sustained=new Set();
+function setMidi(msg,cls){midiStatus.textContent=msg;midiStatus.className='midi-status'+(cls?' '+cls:'');}
+async function connectMidi(){
+  initAudio();
+  if(!navigator.requestMIDIAccess){setMidi('This browser has no Web MIDI. Chrome, Edge, Opera and Firefox support it.','bad');return;}
+  setMidi('Asking for MIDI access…');
+  try{
+    midiAccess=await navigator.requestMIDIAccess({sysex:false});
+    midiAccess.onstatechange=bindInputs;bindInputs();
+    midiBtn.textContent='Rescan MIDI';
+  }catch(e){
+    setMidi('MIDI access was blocked. Allow MIDI devices for this site in your browser\u2019s site settings, then try again.','bad');
+  }
+}
+function bindInputs(){
+  const names=[];
+  midiAccess.inputs.forEach(inp=>{if(inp.state!=='disconnected'){inp.onmidimessage=onMidi;names.push(inp.name||'MIDI input');}});
+  if(names.length)setMidi('Listening to '+names.join(', '),'on');
+  else setMidi('No MIDI inputs found. Plug one in and it connects automatically.');
+}
+function onMidi(ev){
+  const [st,d1,d2]=ev.data,cmd=st&0xf0;
+  if(cmd===0x90&&d2>0){
+    if(ctx&&ctx.state==='suspended')ctx.resume();
+    if(midiHeld.has(d1))return;
+    midiHeld.add(d1);
+    if(sustained.has(d1)){sustained.delete(d1);return;} // still sounding from the damper
+    noteOn(d1);
+  }else if(cmd===0x80||(cmd===0x90&&d2===0)){
+    if(!midiHeld.has(d1))return;
+    midiHeld.delete(d1);
+    if(sustain)sustained.add(d1);else noteOff(d1);
+  }else if(cmd===0xB0){
+    if(d1===64){                               // sustain pedal holds notes
+      sustain=d2>=64;
+      if(!sustain){sustained.forEach(noteOff);sustained.clear();}
+    }else if(d1===123||d1===120){              // all notes off
+      midiHeld.forEach(noteOff);sustained.forEach(noteOff);midiHeld.clear();sustained.clear();
+    }
+  }
+}
+midiBtn.addEventListener('click',connectMidi);
+
+/* ---------- reservoir simulation ---------- */
+const rWind=document.getElementById('rWind'),rPitch=document.getElementById('rPitch'),rReeds=document.getElementById('rReeds'),rUse=document.getElementById('rUse'),statusEl=document.getElementById('status');
+let last=performance.now(),uiT=0;
+function frame(now){
+  const dt=Math.min(.05,(now-last)/1000);last=now;
+  let sounding=0;for(const v of voices.values())if(!v.released)sounding++;
+  const ranksOn=RANKS.filter(r=>stops[r.id]).length;
+  const load=sounding*ranksOn*(stops.forte?1.3:1);
+  const drain=.018+.021*load;
+
+  let inflow=0;
+  for(const P of [ped.L,ped.R]){
+    stepEnv(P,dt);
+    inflow+=P.lvl*PEAK_FLOW*P.boost*(1-Math.min(1,pressure)*.5);
+  }
+  const help=+helperEl.value/100*HELPER_MAX;
+  inflow+=help*Math.max(0,Math.min(1,(.8-pressure)/.12));  // helper eases off near full
+
+  pressure+=(inflow-drain)*dt;
+  if(pressure>1){pressure=1;reliefT=.7;}
+  pressure=Math.max(0,pressure);reliefT=Math.max(0,reliefT-dt);
+
+  const cents=(pressure-.55)*10;
+  if(ctx){
+    const t=ctx.currentTime,p=pressure;
+    const speak=p<.04?0:Math.min(1,(p-.04)/.12);
+    windGain.gain.setTargetAtTime(speak*windLevel(p)*1.7*(stops.forte?1.25:1),t,.03);
+    swell.frequency.setTargetAtTime(450+4200*Math.pow(windBright(p),1.4)*(stops.forte?1.7:1),t,.04);
+    windPitch.offset.setTargetAtTime(cents,t,.05);
+    noiseGain.gain.setTargetAtTime(.025*p*Math.min(1,sounding/3),t,.05);
+  }
+  needle.setAttribute('transform',`rotate(${(-90+180*pressure*.9).toFixed(1)} 100 112)`);
+  for(const P of [ped.L,ped.R]){
+    if(reduceMotion)P.el.style.filter=`brightness(${1+P.lvl*.35})`;
+    else P.el.style.transform=`perspective(400px) rotateX(${(P.lvl*24).toFixed(1)}deg)`;
+    placeDot(P);
+  }
+
+  uiT+=dt;
+  if(uiT>.1){uiT=0;
+    rWind.textContent=(pressure*GMAX*.9).toFixed(1)+'″';
+    const c=Math.round(cents);rPitch.textContent=(c>0?'+':c<0?'−':'')+Math.abs(c)+' ¢';
+    rReeds.textContent=sounding*ranksOn;
+    rUse.textContent=drain.toFixed(2)+'/s';
+    for(const P of [ped.L,ped.R]){
+      P.flowEl.textContent=P.stage==='idle'?'idle':({a:'attack',d:'decay',s:'sustain',r:'release'}[P.stage])+' · '+(P.lvl*PEAK_FLOW*P.boost).toFixed(2)+'/s';
+    }
+    let msg='',ok=false;
+    if(!started){msg='Press a key to start';ok=true;}
+    else if(reliefT>0)msg='Relief valve venting';
+    else if(pressure<.05&&sounding)msg='Out of wind. Pump!';
+    else if(pressure<.2)msg='Wind is low';
+    else if(help>0&&help<drain&&sounding&&inflow<drain)msg='Helper can’t keep up; wind falling';
+    else{msg=help>0?'Helper pumping':'Keep pumping to hold the wind';ok=true;}
+    statusEl.textContent=msg;statusEl.classList.toggle('ok',ok);
+  }
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
