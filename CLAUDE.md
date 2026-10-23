@@ -46,6 +46,11 @@ repo. Every change arrives as a PR from a branch; never push to `main`.
   `noteOn` / `noteOff` directly; `press` adds coupled octaves and `recouple()`
   updates held keys when a coupler changes. Voices are reference-counted, so a
   note held both directly and through a coupler sounds once.
+- Each reed's tuning error is `reedScatter(i, m)` and its wind response is
+  `reedWindResp(i, m)`, both from `reedRand` (a hash of rank, key and
+  `reedSeed`). Every oscillator has its own gain node between `windPitch` and its
+  detune (`v.winds[i]`); `rewind()` updates them on sounding notes. There are
+  no fixed per-rank detunes any more (`det` is 0 except via the Celeste).
 - Rank voicing lives in `voicing[i].level|tune|bright`. Use `rankLevel(i)` for a
   rank's bus gain (it includes the brightness loudness compensation),
   `rankCents(i, f, m)` for its pitch offset, and `rankWave(i)` for its waveform.
