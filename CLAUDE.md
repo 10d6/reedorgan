@@ -24,7 +24,7 @@ repo. Every change arrives as a PR from a branch; never push to `main`.
   try/catch). New sliders should save and restore their value the same way.
 - Audio graph: rank buses (one set per half: `buses.bass[i]`, `buses.treble[i]`;
   a note routes by `halfOf(m)`) → swell lowpass → tilt high-shelf → wind gain →
-  tremolo → body EQ →
+  tremolo gain → fan stereo panner → body EQ →
   cabinet convolver (dry/wet) → room convolver (dry/wet) → compressor → output.
   Breath noise joins at the tremolo. Wind pressure (0–1, gauge reads
   `pressure × 3.6″`) drives level and pitch in the `frame()` loop. Tone follows
@@ -33,6 +33,12 @@ repo. Every change arrives as a PR from a branch; never push to `main`.
   follows the wind; in the `sweep` model the lowpass cutoff follows the wind
   and the shelf is flat. `sweep` at depth 100% with a 20 ms response reproduces
   the original sound.
+- Vox Humana: `lfo` drives `lfoAmp` (tremolo gain), `lfoFilt` (lid filter
+  detune) and, via `lfoPan` (a cosine oscillator started at the same moment so
+  the two stay phase-locked), `lfoPanAmt` → `fanPan.pan`. `applyVox()` sets all
+  depths and the fan speed, spinning up on draw and coasting down on retire.
+  The Spinning fan shape is one turn of a two-blade fan, so `lfoFreq()` is half
+  the displayed speed for that shape.
 - Stop state is `stops.bass[id]` / `stops.treble[id]` plus `stops.vox`,
   `stops.sub` and `stops.sup` (octave couplers). When stops are not divided,
   both halves are kept identical.
