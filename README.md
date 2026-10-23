@@ -39,6 +39,11 @@ changes the organ's loudness, brightness, pitch and how quickly notes speak.
 - **Adjustments**: reservoir size, pitch drift with pressure, reed speech
   speed, pitch scoop, Celeste beat rate, Cabinet and Room reverb, breath noise
   level and treadle noise level.
+- **Individual reeds**: every reed (each rank on each key) has its own small,
+  random tuning error (*Reed scatter*) and its own response to the wind (*Drift
+  variation*, larger for low reeds). Beats between reeds differ from key to key
+  and shift as the wind moves, so no pattern settles in. *Fit a new set of
+  reeds* draws a fresh set.
 - **Wind tone**: how the wind colours the sound. *Natural tilt* (the default)
   shifts the balance of upper harmonics against the fundamental, as a real reed
   does; *Filter sweep* is the original moving lowpass. Depth, resonance (Q) and
