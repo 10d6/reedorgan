@@ -22,6 +22,9 @@ changes the organ's loudness, brightness, pitch and how quickly notes speak.
   and Principal 4′. The Celeste is tuned to beat at the same rate on every note.
 - **Divided stops**: optionally split every rank into bass and treble halves, at
   E | F below middle C (the traditional American split) or at middle C.
+- **Octave couplers**: Sub Octave and Super Octave pull down the keys an octave
+  below or above, so each coupled note sounds with the stops drawn in its own
+  half. Drawing one while holding a chord brings the octave in straight away.
 - **Vox Humana** fan tremolo with adjustable speed, and a continuous **knee
   swell** that opens the lid gradually for a louder, brighter sound that uses
   more wind.
@@ -33,6 +36,10 @@ changes the organ's loudness, brightness, pitch and how quickly notes speak.
 - **Adjustments**: reservoir size, wind sensitivity (how far pitch and
   brightness move with pressure), reed speech speed, pitch scoop, Celeste beat
   rate, Cabinet and Room reverb, breath noise level and treadle noise level.
+- **Rank voicing**: a drawer under Adjustments with level, fine tuning (±20
+  cents) and brightness for each rank, plus a button to restore the factory
+  voicing. Brightness reshapes the rank's harmonics and is level-matched, so it
+  changes the tone rather than the volume.
 
 Settings are remembered in your browser.
 
