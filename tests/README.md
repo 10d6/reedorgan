@@ -7,9 +7,10 @@ produces. They run on every pull request (the **test** job in
 ```sh
 npm ci                                   # once
 npx playwright install chromium          # once (not needed in Claude sessions; see CLAUDE.md)
-npx playwright test                      # everything
+npx playwright test                      # everything in the browser
 npx playwright test tests/sound.spec.js  # one file
 npx playwright test -g "Vox"             # by name
+npm run test:unit                        # unit tests for js/core (no browser, under a second)
 ```
 
 The config starts `scripts/serve.mjs` on port 8123 automatically.
@@ -22,6 +23,7 @@ The config starts `scripts/serve.mjs` on port 8123 automatically.
 | `stops.spec.js` | Default stops; one reed per drawn stop; divided stops at both split points; undividing; couplers pulling keys and following held chords; reference-counted notes. |
 | `input.spec.js` | Mouse drag across keys; computer-key mapping; the wind running out and treadles refilling it; MIDI notes, sustain, expression (CC11/CC4) and all-notes-off; Space pumping. |
 | `settings.spec.js` | Settings survive a reload; linked and unlinked treadle envelopes; factory voicing reset; fitting new reeds; readout formats. |
+| `unit/core.test.mjs` | The pure maths in `js/core`: Celeste beats at a constant rate; reed errors are uncorrelated between neighbouring keys and octaves (the old sawtooth fails this); wind response; the loudness knee; brightness compensation; the fan wave's shape; treadle envelope stages. |
 | `sound.spec.js` | Measured audio: silence and sound; rank Level −6 dB at 50%; Brightness changes tone but not volume; knee swell louder and brighter; Sub octave adds bass; the Vox Humana fan leaves bass and loudness steady and flickers the treble, stereo sweep moves only the treble, whole-sound wobble still works, and the fan coasts to a stop. |
 
 The sound tests check the properties recorded in `docs/decisions.md`. If a test

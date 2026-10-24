@@ -61,13 +61,16 @@ Settings are remembered in your browser.
 
 ## How the repository works
 
-The whole instrument is one file, `index.html`, with no build step and no
-dependencies. Open it in a browser to run it locally.
+The instrument is plain HTML, CSS and JavaScript modules, with no build step
+and no dependencies. To play it locally, run `npm run serve` (or `node
+scripts/serve.mjs`) and open http://localhost:8080/. Browsers won't load the
+modules from a file opened directly.
 
-- Every pull request runs `node scripts/check.mjs`, which confirms the page is a
-  complete document, the script parses, element ids match, and nothing loads from
-  outside Google Fonts. It also runs the browser tests in `tests/`, which play the
-  organ and measure its sound (`npm ci && npx playwright test`).
+- Every pull request runs `node scripts/check.mjs` (the page and modules are
+  consistent: files exist, code parses, imports match exports, element ids exist,
+  nothing loads from outside Google Fonts), unit tests for the sound maths
+  (`npm run test:unit`), and browser tests that play the organ and measure its
+  sound (`npm ci && npx playwright test`).
 - Merging to `main` publishes the page automatically. GitHub Pages serves the
   repository root of `main` directly (Settings → Pages → Deploy from a branch);
   `.nojekyll` tells it to serve the files as they are.

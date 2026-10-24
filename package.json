@@ -5,9 +5,11 @@
   "scripts": {
     "check": "node scripts/check.mjs",
     "serve": "node scripts/serve.mjs",
+    "test:unit": "node --test tests/unit/*.test.mjs",
     "test": "playwright test"
   },
   "devDependencies": {
     "@playwright/test": "1.56.0"
-  }
+  },
+  "type": "module"
 }

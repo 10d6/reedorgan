@@ -15,7 +15,7 @@ These come from the owner's own feedback and apply to every change:
 - **Defaults keep the current sound.** New controls start at a setting that sounds like before, unless the change is a fix the owner asked for. Then the PR says so, and says how to get the old sound back.
 - **The owner only reviews and merges PRs.** PR descriptions are the main communication: what the player hears, measurements, and what to try.
 
-## D1. One page, no build, Pages from the branch
+## D1. Static files, no build, Pages from the branch
 
 **Chosen:** the instrument ships as static files served by GitHub Pages straight from the root of `main` ("Deploy from a branch"), with `.nojekyll`. There's no build step and nothing to install.
 **Why:** the owner set Pages to branch deploy. An Actions-based deploy would need a settings change on their side and one more thing to fail. The first Actions workflow failed and was removed in PR #2.
@@ -68,3 +68,10 @@ These come from the owner's own feedback and apply to every change:
 **Chosen:** Playwright tests (`tests/`) that use the organ only through its controls, readouts and speaker output, run in CI on every PR. Sound properties from this log are asserted with tolerances. For example, the Vox Humana bass pulse must be under 0.6 dB with treble flicker of 3–9 dB, Level 50% must equal −6 dB, and Brightness ±100 must stay within 3.5 dB of volume.
 **Why:** the measurement scripts used to live only in a session's scratch space and were lost when it ended. Black-box tests also survive refactors: the same tests check that restructuring the code changes nothing. Each test was confirmed to catch a deliberately planted bug, and the timing-sensitive tests passed 3 out of 3 repeated runs.
 **Revisit if:** CI time grows past a few minutes, or a sound test proves flaky. Widen the tolerance or measure longer before deleting it.
+
+## D11. Native ES modules, pure maths in `js/core`
+
+**Chosen:** the single 1,300-line `index.html` was split into `css/organ.css` and twelve modules under `js/`, loaded by the browser as native ES modules, still with no build step (D1). Pure maths lives in `js/core/` with explicit inputs (seed, spread, brightness…) and no page or audio access, and has unit tests (`tests/unit`). Modules do no work at load time; `main.js` calls each module's setup in a fixed order.
+**Why:** each session had to read and exact-match-edit one huge file, and the maths couldn't be tested without pulling functions out of the HTML. A bundler would have needed either committed build output or Actions-based Pages, against D1. The cost is that the page needs HTTP to run locally (`npm run serve`); the owner agreed to that.
+**Verified:** all 34 browser tests passed unchanged before and after the split. A side-by-side measurement of the old and new page gave the same Vox Humana, stereo and brightness figures within measurement noise (≤0.2 dB). The unit tests reject the old sawtooth reed generator (D7). `scripts/check.mjs` checks that every import names a real export and every element lookup exists, and it caught each of three planted mistakes.
+**Rule:** because `audio.js` and `controls.js` (and `audio.js` and `keys.js`) import each other, nothing may run at module load except definitions that use only `js/core` and `state.js`.
