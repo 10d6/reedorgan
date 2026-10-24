@@ -101,7 +101,7 @@ Modulators (all audio-rate `AudioParam` connections):
 physics is simulated:
 
 1. Pedal autoplay (`stepAutoplay`): works out which treadle the pattern holds down now (`pedalsAt`) and calls `gateOn`/`gateOff` on changes. It does nothing until the audio context exists (the player's first touch). Then step both treadle ADSR envelopes (`stepEnvelope`).
-2. Reservoir: `pressure += (inflow − drain) · dt / reservoirSize`. Inflow comes from the treadles (alternating feet fill better) and the helper pump. Drain grows with sounding reeds and the knee swell. Pressure is clamped to 0–1, and the relief valve vents at 1.
+2. Reservoir: `pressure += (inflow − drain) · dt / reservoirSize`. Inflow comes from the treadles (alternating feet fill better) and the helper pump. Drain (`windDrain`) grows with sounding reeds and the knee swell; with Easy wind it counts at most three reeds (D23). Pressure is clamped to 0–1, and the relief valve vents at 1.
 3. Smooth the knee swell (`swellPos`) and the tone pressure (`tonePress`, Response time).
 4. `applyWind()` pushes targets into the audio graph: wind gain (`windLevel`, with a knee at 2″), lid filter and `tiltDb` (depending on the tone model; each reed's own shelf applies the tilt, D17), `windPitch` offset (`windCents`: flat as the wind rises, D12), breath noise level.
 5. Update the gauge, treadle visuals and readouts (readouts at 10 Hz).
@@ -132,7 +132,7 @@ held keys when a coupler is drawn or retired.
 
 - **Stops** (`stops.bass[id]`, `stops.treble[id]`, `stops.vox`, `stops.sub`, `stops.sup`) are not saved; the organ always opens with Diapason and Melodia drawn.
 - **Settings** are saved in `localStorage` under `reed-<key>` through `store.get` / `store.set`. Most use `bindSlider(id, key, default, format, onChange, map)` in `controls.js`: the input id ends in `Amt`, its `<output>` in `Out`, and `map` turns the slider position into the value the sound uses. Add the result to `ctl` so other modules can read `ctl.name.value`.
-- **Saved choices** that aren't sliders (`S.splitMode`, `S.compass`, `S.toneModel`, `S.voxShape`, `S.reedSeed`) are read once in `state.js`.
+- **Saved choices** that aren't sliders (`S.splitMode`, `S.compass`, `S.easyWind`, `S.toneModel`, `S.voxShape`, `S.reedSeed`) are read once in `state.js`.
 - **Reed set**: `S.reedSeed` feeds `reedRand(seed, i, m, salt)`, a hash used for each reed's tuning error and wind response.
 
 ## Where features live
@@ -151,6 +151,7 @@ held keys when a coupler is drawn or retired.
 | Speech and Tone bloom | `core/speech.js`, `audio.js`, `controls.js` | `speechTime`, `windSpeech`, `onsetTau`, `BLOOM_LAG`, `ctl.speech`, `ctl.bloom` |
 | Vox Humana | `audio.js`, `core/fan.js`, `controls.js` | `applyVox`, `setFanShape`, `fanWaveCoefficients`, `lfoFreq`, `fanLow`, `shadow`, `refl`, `hiPan` |
 | Case and room | `audio.js` | `cabinetIR`, `impulse`, `applyMix`, `mix` |
+| Easy wind | `core/wind.js`, `wind-loop.js`, `treadles.js`, `state.js` | `windDrain`, `EASY_REEDS`, `S.easyWind`, `#easyWind` |
 | Pedal autoplay | `autoplay.js`, `core/autoplay.js`, `controls.js`, `wind-loop.js` | `stepAutoplay`, `setupAutoplay`, `retime`, `pedalsAt`, `noteAt`, `reshape`, `METERS`, `ctl.tempo`, store key `autoplay` |
 | MIDI | `keys.js` | `connectMidi`, `onMidi` (notes, CC64 sustain, CC11/CC4 swell, CC120/123) |
 | All notes off | `keys.js`, `audio.js` | `allNotesOff`, `silenceAll`, `#panicBtn`, Escape; computer keys tracked by `KeyboardEvent.code` (`CODEMAP`, `keyId`) |

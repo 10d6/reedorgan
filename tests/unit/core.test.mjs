@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import { RANKS, CELESTE, SPLITS, noteFreq, waveRecipe, scaledRms, loudnessComp, celesteCents, WAVE_SPECS, WAVE_SPECS_V1 } from "../../js/core/ranks.js";
 import { windSpeech, speechTime, onsetTau, onsetShape, RISE_PER_TAU, TILT_RATIO } from "../../js/core/speech.js";
 import { reedRand, reedTri, reedError, reedWindResponse, lockReeds } from "../../js/core/reeds.js";
-import { windLevel, windBright, windCents, KNEE, P_REF, gaugeInches, toTime, toSlider, fmtT, stepEnvelope, DEFAULT_ENV } from "../../js/core/wind.js";
+import { windLevel, windBright, windCents, windDrain, EASY_REEDS, KNEE, P_REF, gaugeInches, toTime, toSlider, fmtT, stepEnvelope, DEFAULT_ENV } from "../../js/core/wind.js";
 import { fanWaveCoefficients } from "../../js/core/fan.js";
 import { METERS, DEFAULT_PATTERN, normalise, reshape, nextCell, cellSeconds, noteAt, pedalsAt, liftGap } from "../../js/core/autoplay.js";
 import { volumeGain, bassCutHz, limiterMakeupDb, softClip, softClipCurve } from "../../js/core/output.js";
@@ -233,4 +233,14 @@ test("D22: editing: cycle order, reshaping meters and measures, and cleaning bad
   assert.deepEqual(normalise({ meter: "7/9", measures: 9, cells: ["X"] }).cells.length, 16, "bad meter → 4/4, measures capped at 4");
   assert.equal(normalise(null).on, true);
   assert.equal(normalise({ on: false }).on, false);
+});
+
+test("D23: Easy wind charges for at most three reeds; off, every reed counts", () => {
+  near(windDrain(0, 0, false), 0.018, 1e-12, "a little leakage with nothing playing");
+  near(windDrain(2, 0, false), 0.018 + 0.042, 1e-12);
+  near(windDrain(30, 0, false), 0.018 + 0.63, 1e-12, "full organ, six notes");
+  assert.equal(EASY_REEDS, 3);
+  near(windDrain(30, 0, true), windDrain(3, 0, false), 1e-12, "capped at three reeds");
+  near(windDrain(2, 0, true), windDrain(2, 0, false), 1e-12, "below the cap, the same as off");
+  near(windDrain(30, 1, true), 0.018 + 0.021 * 3 * 1.3, 1e-12, "the open swell still draws more");
 });

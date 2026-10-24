@@ -97,6 +97,9 @@ function buildFoot(P, feetEl) {
 }
 
 export function setupTreadles() {
+  const easyEl = document.getElementById('easyWind');   // Easy wind (D23)
+  easyEl.checked = S.easyWind;
+  easyEl.addEventListener('change', () => { S.easyWind = easyEl.checked; store.set('easyWind', S.easyWind); });
   linkEl = document.getElementById('link');
   linkEl.checked = store.get('link', true);
   linkEl.addEventListener('change', () => {

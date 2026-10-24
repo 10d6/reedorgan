@@ -25,6 +25,14 @@ export function windLevel(p) {
 // its frequency. At low wind they sit sharp, nearer their natural frequency.
 export const windCents = (p, sens) => (P_REF - p) * sens;
 
+// How fast the sounding reeds drain the reservoir, per second. Each reed draws
+// air, more with the knee swell open. Easy wind (D23) charges for at most
+// EASY_REEDS reeds, the air of three notes on a single stop, however many
+// notes and stops are playing, so big chords and stop changes don't call for
+// harder pumping. The sound is unchanged; only the bellows are easier.
+export const EASY_REEDS = 3;
+export const windDrain = (reeds, swellPos, easy) => .018 + .021 * (easy ? Math.min(reeds, EASY_REEDS) : reeds) * (1 + .3 * swellPos);
+
 // Brightness keeps climbing above the knee, but at half the rate.
 export const windBright = p => p <= KNEE ? p : KNEE + (p - KNEE) * .5;
 

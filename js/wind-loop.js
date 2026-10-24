@@ -3,7 +3,7 @@
 // the gauge, pedals and readouts.
 
 import { RANKS, HALVES } from './core/ranks.js';
-import { GMAX, PEAK_FLOW, gaugeInches, windCents, stepEnvelope } from './core/wind.js';
+import { GMAX, PEAK_FLOW, gaugeInches, windCents, windDrain, stepEnvelope } from './core/wind.js';
 import { S, stops, voices, reduceMotion } from './state.js';
 import { applyWind } from './audio.js';
 import { ctl } from './controls.js';
@@ -35,8 +35,7 @@ function frame(now) {
   HALVES.forEach(h => { ranksOn[h] = RANKS.filter(r => stops[h][r.id]).length; });
   let sounding = 0, reeds = 0;
   for (const v of voices.values()) if (!v.released) { sounding++; reeds += ranksOn[v.half]; }
-  const load = reeds * (1 + .3 * S.swellPos);
-  const drain = .018 + .021 * load;
+  const drain = windDrain(reeds, S.swellPos, S.easyWind);   // Easy wind caps the air at three reeds (D23)
 
   stepAutoplay();                     // pedal autoplay presses and lifts the treadles (D22)
   let inflow = 0;
