@@ -62,3 +62,9 @@ These come from the owner's own feedback and apply to every change:
 
 **Chosen:** sound changes are checked by measuring the rendered audio in headless Chromium: band levels, spectral centroid, envelope depth, stereo balance. Results go in the PR.
 **Why:** the measurements caught real problems that reading the code didn't, such as the 10 dB brightness/volume coupling (D4) and the wah's real cause (D6).
+
+## D10. Black-box tests in a real browser
+
+**Chosen:** Playwright tests (`tests/`) that use the organ only through its controls, readouts and speaker output, run in CI on every PR. Sound properties from this log are asserted with tolerances. For example, the Vox Humana bass pulse must be under 0.6 dB with treble flicker of 3–9 dB, Level 50% must equal −6 dB, and Brightness ±100 must stay within 3.5 dB of volume.
+**Why:** the measurement scripts used to live only in a session's scratch space and were lost when it ended. Black-box tests also survive refactors: the same tests check that restructuring the code changes nothing. Each test was confirmed to catch a deliberately planted bug, and the timing-sensitive tests passed 3 out of 3 repeated runs.
+**Revisit if:** CI time grows past a few minutes, or a sound test proves flaky. Widen the tolerance or measure longer before deleting it.

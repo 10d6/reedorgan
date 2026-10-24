@@ -14,7 +14,8 @@ work in the repo.
 
 - Every change arrives as a PR from a branch made from the latest `main`. Never push to `main`. Before starting, check whether earlier PRs have merged.
 - Keep the instrument static and build-free (decision D1). The only external resource allowed is Google Fonts.
-- Run `node scripts/check.mjs` before opening a PR. Pages deploys every merge without re-checking, so never open a PR with a failing check.
+- Before opening a PR, run `node scripts/check.mjs` and `npx playwright test`. Pages deploys every merge without re-checking, so never open a PR with a failing check or test.
+- The tests are black-box (see `tests/README.md`). Keep the ids, aria-labels and readouts they rely on stable, or update the tests in the same PR. If a deliberate sound change fails a test, update the test and its `docs/decisions.md` entry together.
 - Defaults keep the current sound unless the owner asked for a change.
 - For anything audible, measure the rendered audio and put the numbers in the PR (D9).
 - Add a `docs/decisions.md` entry for every design choice. Update `docs/architecture.md` when structure or names change.
@@ -31,5 +32,5 @@ work in the repo.
 
 - GitHub GraphQL is blocked from these sessions, so `gh pr create` fails. Open PRs with the REST API: `gh api -X POST repos/paperclipsoftware/reedorgan/pulls --input pr.json` (JSON with `title`, `head`, `base`, `body`). Check CI with `gh api repos/paperclipsoftware/reedorgan/commits/<branch>/check-runs`.
 - The Pages settings API is blocked too. Pages changes need the owner.
-- Chromium for Playwright is preinstalled at `/opt/pw-browsers`. Launch with `--autoplay-policy=no-user-gesture-required` so Web Audio runs headless.
+- Chromium for Playwright is preinstalled: run tests with `PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers npx playwright test` after `npm ci`, with no browser download needed. `@playwright/test` is pinned to 1.56.0 to match that browser; change both together.
 - `github.io` isn't reachable from the session, so test against the local files.
