@@ -17,7 +17,7 @@ exists. For *why* things are built this way, see [decisions.md](decisions.md).
 | `js/stops.js` | Stop rail and the divided-stops selector. |
 | `js/treadles.js` | The two treadles: ADSR state (`ped`), pedals, envelope pictures, `gateOn`/`gateOff`. |
 | `js/wind-loop.js` | The per-frame control loop (`frame`), the gauge and readouts. |
-| `js/core/*.js` | Pure maths, with no page or audio access: `ranks.js` (ranks, harmonic recipes, brightness compensation, Celeste), `reeds.js` (per-reed scatter, wind response and Unison pull), `wind.js` (loudness, brightness and pitch against pressure, treadle envelopes), `speech.js` (how a reed speaks: onset time and shape, tone bloom, the tone shelf's position), `fan.js` (the spinning-fan wave). |
+| `js/core/*.js` | Pure maths, with no page or audio access: `ranks.js` (ranks, harmonic recipes, brightness compensation, Celeste), `reeds.js` (per-reed scatter, wind response and Unison pull), `wind.js` (loudness, brightness and pitch against pressure, treadle envelopes), `speech.js` (how a reed speaks: onset time and shape, tone bloom, the tone shelf's position), `fan.js` (the spinning-fan wave), `output.js` (volume, cabinet bass corner, limiter make-up, soft clip). |
 | `tests/*.spec.js` | Playwright tests that play the organ and measure its sound. See `tests/README.md`. |
 | `tests/unit/` | Unit tests for `js/core` (`npm run test:unit`, no browser). |
 | `scripts/check.mjs` | Static checks: page shape, referenced files, module syntax, imports resolve to real exports, element ids, allowed external hosts. |
@@ -73,7 +73,7 @@ flowchart LR
     WP["windPitch<br/>(cents)"] --> WR["per-reed gain<br/>v.winds[i]"] --> O1
   end
   E1 --> B["rank buses<br/>buses.bass[i] / buses.treble[i]"]
-  B --> SW["swell lowpass<br/>(lid / sweep)"] --> WG["wind gain"] --> TR["trem gain"]
+  B --> SW["swell lowpass<br/>(lid / sweep)"] --> BC["bassCut highpass<br/>(Cabinet bass)"] --> WG["wind gain"] --> TR["trem gain"]
   N["breath noise"] --> TR
   TR --> FIN
   subgraph FAN["Fan stage (Vox Humana)"]
@@ -83,7 +83,7 @@ flowchart LR
     HB --> SH["shadow gain"] --> HP["hiPan"] --> SUM
     HB --> RF["refl delay"] --> RG["reflGain"] --> SH
   end
-  SUM --> EQ["body EQ<br/>230 Hz, 1.1 kHz, 6 kHz shelf"] --> CAB["cabinet convolver<br/>dry / wet"] --> ROOM["room convolver<br/>dry / wet"] --> CMP["compressor"] --> OUT["master → speakers"]
+  SUM --> EQ["body EQ<br/>230 Hz, 1.1 kHz, 6 kHz shelf"] --> CAB["cabinet convolver<br/>dry / wet"] --> ROOM["room convolver<br/>dry / wet"] --> CMP["compressor"] --> OUT["master (Volume) → limiter → soft clip → speakers"]
 ```
 
 Modulators (all audio-rate `AudioParam` connections):
@@ -130,7 +130,7 @@ held keys when a coupler is drawn or retired.
 
 - **Stops** (`stops.bass[id]`, `stops.treble[id]`, `stops.vox`, `stops.sub`, `stops.sup`) are not saved; the organ always opens with Diapason and Melodia drawn.
 - **Settings** are saved in `localStorage` under `reed-<key>` through `store.get` / `store.set`. Most use `bindSlider(id, key, default, format, onChange, map)` in `controls.js`: the input id ends in `Amt`, its `<output>` in `Out`, and `map` turns the slider position into the value the sound uses. Add the result to `ctl` so other modules can read `ctl.name.value`.
-- **Saved choices** that aren't sliders (`S.splitMode`, `S.toneModel`, `S.voxShape`, `S.reedSeed`) are read once in `state.js`.
+- **Saved choices** that aren't sliders (`S.splitMode`, `S.compass`, `S.toneModel`, `S.voxShape`, `S.reedSeed`) are read once in `state.js`.
 - **Reed set**: `S.reedSeed` feeds `reedRand(seed, i, m, salt)`, a hash used for each reed's tuning error and wind response.
 
 ## Where features live
@@ -150,3 +150,7 @@ held keys when a coupler is drawn or retired.
 | Vox Humana | `audio.js`, `core/fan.js`, `controls.js` | `applyVox`, `setFanShape`, `fanWaveCoefficients`, `lfoFreq`, `fanLow`, `shadow`, `refl`, `hiPan` |
 | Case and room | `audio.js` | `cabinetIR`, `impulse`, `applyMix`, `mix` |
 | MIDI | `keys.js` | `connectMidi`, `onMidi` (notes, CC64 sustain, CC11/CC4 swell, CC120/123) |
+| All notes off | `keys.js`, `audio.js` | `allNotesOff`, `silenceAll`, `#panicBtn`, Escape; computer keys tracked by `KeyboardEvent.code` (`CODEMAP`, `keyId`) |
+| Compass | `keys.js`, `state.js` | `COMPASS`, `inCompass`, `couplesFor`, `S.compass` |
+| Volume, limiter, cabinet bass | `audio.js`, `core/output.js`, `controls.js` | `applyOutput`, `master`, `MASTER`, `limiterMakeupDb`, `softClipCurve`, `bassCut`, `ctl.volume`, `ctl.bassCut` |
+| Knee swell range | `audio.js` | `SWELL_CLOSED`, `SWELL_OPEN` |

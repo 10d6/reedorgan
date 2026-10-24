@@ -18,6 +18,7 @@ export const S = {
   lastSide: null,      // which treadle was pressed last
   started: false,      // a note has been played
   splitMode: saved('split', 'none', v => !!SPLITS[v]),
+  compass: saved('compass', 'full', v => v === 'full' || v === 'organ'),
   toneModel: saved('toneModel', 'tilt', v => v === 'tilt' || v === 'sweep'),
   voxShape: saved('voxShape', 'sine', v => v === 'sine' || v === 'fan'),
   reedSeed: store.get('reedSeed', 1),

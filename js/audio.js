@@ -6,6 +6,7 @@ import { reedError, reedWindResponse, lockReeds } from './core/reeds.js';
 import { windLevel, windBright, windCents, P_REF } from './core/wind.js';
 import { fanWaveCoefficients } from './core/fan.js';
 import { speechTime, onsetTau, BLOOM_LAG, TILT_RATIO } from './core/speech.js';
+import { LIMIT, LIMIT_RATIO, limiterMakeupDb, softClipCurve } from './core/output.js';
 import { S, stops, voices, halfOf } from './state.js';
 import { ctl, mix } from './controls.js';
 import { markKey } from './keys.js';
@@ -13,7 +14,13 @@ import { markKey } from './keys.js';
 export let ctx = null;
 let waves, buses = { bass: [], treble: [] }, swell, tiltDb, windGain, trem, lfo, lfoAmp, lfoFilt, windPitch, noiseGain;
 let hiPan, lfoPan, lfoPanAmt, fanLow, shadow, lfoShadow, refl, reflGain, lfoRefl;
-let cabDry, cabWet, roomWet;
+let cabDry, cabWet, roomWet, bassCut, master;
+// The knee swell's loudness, closed and fully open, on top of the brighter lid
+// (D21). Before D21 it was 1 → 1.25.
+export const SWELL_CLOSED = .75, SWELL_OPEN = 1.5;
+// The limiter (D20) adds its own make-up gain; MASTER trims it back out, so below
+// the limit the level at Volume 100% is exactly as before (0.8).
+const MASTER = .8 * Math.pow(10, -limiterMakeupDb() / 20);
 
 /* ---------- ranks ---------- */
 // Brightness level-matching (D4): gain per rank that keeps its loudness at any brightness.
@@ -67,6 +74,12 @@ function cabinetIR() {
     let y = 0; for (let i = 0; i < len; i++) { y += .55 * (d[i] - y); d[i] = y; }   // wood soaks up the highs
   }
   return buf;
+}
+// Volume and Cabinet bass, from their sliders.
+export function applyOutput() {
+  if (!ctx) return; const t = ctx.currentTime;
+  master.gain.setTargetAtTime(MASTER * ctl.volume.value, t, .03);
+  bassCut.frequency.setTargetAtTime(ctl.bassCut.value, t, .03);
 }
 export function applyMix() {
   if (!ctx) return; const t = ctx.currentTime, c = mix.cab / 100, r = mix.room / 100;
@@ -159,14 +172,24 @@ export function initAudio() {
   cabDry = ctx.createGain(); cabDry.gain.value = 1;
   cabWet = ctx.createGain(); cabWet.gain.value = 0;
   const cabSum = ctx.createGain();
-  const master = ctx.createGain(); master.gain.value = .8;
+  // Volume (D20), then a limiter that only acts on peaks near full scale, so
+  // turning the volume up can't clip the speakers.
+  master = ctx.createGain(); master.gain.value = MASTER * ctl.volume.value;
+  const limiter = ctx.createDynamicsCompressor(); limiter.threshold.value = LIMIT; limiter.knee.value = 0; limiter.ratio.value = LIMIT_RATIO; limiter.attack.value = .002; limiter.release.value = .15;
+  // The cabinet radiates little below about 80 Hz (D19): a gentle highpass on the reeds.
+  // Q is in dB for a highpass: −3.01 dB is flat (Butterworth), with no bump above the corner.
+  bassCut = ctx.createBiquadFilter(); bassCut.type = 'highpass'; bassCut.Q.value = -3.01; bassCut.frequency.value = ctl.bassCut.value;
   HALVES.forEach(h => RANKS.forEach((r, i) => { const g = ctx.createGain(); g.gain.value = stops[h][r.id] ? rankLevel(i) : 0; g.connect(swell); buses[h][i] = g; }));
-  swell.connect(windGain).connect(trem);
+  swell.connect(bassCut).connect(windGain).connect(trem);
   fanOut.connect(body1).connect(body2).connect(shelf);
   // reeds → cabinet (dry + boxy reflections) → room (dry + long tail)
   shelf.connect(cabDry).connect(cabSum); shelf.connect(cabConv).connect(cabWet).connect(cabSum);
   cabSum.connect(dry).connect(comp); cabSum.connect(conv).connect(roomWet).connect(comp);
-  comp.connect(master).connect(ctx.destination);
+  // The limiter isn't a brickwall: a sharp transient can overshoot by a fraction
+  // of a dB. A soft clip that leaves everything below 90% of full scale alone
+  // rounds those off before the speakers.
+  const ceiling = ctx.createWaveShaper(); ceiling.curve = softClipCurve(); ceiling.oversample = '2x';
+  comp.connect(master).connect(limiter).connect(ceiling).connect(ctx.destination);
   windPitch = ctx.createConstantSource(); windPitch.offset.value = 0; windPitch.start();
   const nb = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate), nd = nb.getChannelData(0);
   for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
@@ -190,7 +213,7 @@ export function applyWind(sounding) {
   const t = ctx.currentTime, p = S.pressure;
   const speak = p < .04 ? 0 : Math.min(1, (p - .04) / .12);
   const bRef = windBright(P_REF), dBright = (windBright(S.tonePress) - bRef) * ctl.toneDepth.value;
-  windGain.gain.setTargetAtTime(speak * windLevel(p) * 1.7 * (1 + .25 * S.swellPos), t, .03);
+  windGain.gain.setTargetAtTime(speak * windLevel(p) * 1.7 * (SWELL_CLOSED + (SWELL_OPEN - SWELL_CLOSED) * S.swellPos), t, .03);
   swell.Q.setTargetAtTime(ctl.toneQ.value, t, .05);
   if (S.toneModel === 'sweep') {
     // depth 100% reproduces the original sweep exactly
@@ -212,7 +235,7 @@ export function thump(level) {
   const t = ctx.currentTime, o = ctx.createOscillator(), g = ctx.createGain();
   o.frequency.setValueAtTime(90, t); o.frequency.exponentialRampToValueAtTime(45, t + .08);
   g.gain.setValueAtTime(.085 * level, t); g.gain.exponentialRampToValueAtTime(.0001, t + .1);
-  o.connect(g).connect(ctx.destination); o.start(t); o.stop(t + .12);
+  o.connect(g).connect(master); o.start(t); o.stop(t + .12);
 }
 
 /* ---------- voices ---------- */
@@ -282,6 +305,14 @@ export function revoice(i) {
   applyStops();
   waves[i] = rankWave(i);
   for (const v of voices.values()) if (!v.released) v.oscs[i].setPeriodicWave(waves[i]);
+}
+// All notes off (D18): silences every voice at once, sounding or releasing, and
+// clears the keys drawn as pressed.
+export function silenceAll() {
+  if (ctx) for (const v of voices.values()) { v.refs = 0; killVoice(v, .03); }
+  for (const m of voices.keys()) markKey(m, false);
+  voices.clear();
+  document.querySelectorAll('#keys .key.down').forEach(el => el.classList.remove('down'));
 }
 function killVoice(v, tc) {
   const t = ctx.currentTime; v.released = true;
