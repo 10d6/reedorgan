@@ -15,8 +15,9 @@ changes the organ's loudness, brightness, pitch and how quickly notes speak.
 | Steady wind | Tick **Easy wind** (in Treadles) so chords and extra stops use no more air than three notes. Or speed up or busy the autoplay rhythm, or raise **Helper pump** under Adjustments (2% by default). If you play more than the wind supplies, it slowly runs out |
 | Swell | Move the **Knee swell** slider, or use a MIDI expression pedal (CC11 or CC4) |
 | Volume | The **Volume** slider. Above 100% a limiter keeps loud chords clean |
-| Stuck note | **All notes off**, or `Esc` |
-| MIDI keyboard | Click **Connect MIDI keyboard**. Works in Chrome, Edge, Opera and Firefox. Responds to notes, the sustain pedal (CC64), expression (CC11/CC4) and all-notes-off |
+| Stuck note | **All notes off** (top right), or `Esc` |
+| Explanations | Tap the small **i** beside any heading to show or hide what its controls do |
+| MIDI keyboard | Click **Connect MIDI** (top right). Works in Chrome, Edge, Opera and Firefox. Responds to notes, the sustain pedal (CC64), expression (CC11/CC4) and all-notes-off |
 
 ## What's in it
 

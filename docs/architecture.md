@@ -7,7 +7,7 @@ exists. For *why* things are built this way, see [decisions.md](decisions.md).
 
 | Path | What it is |
 | --- | --- |
-| `index.html` | The markup: cabinet, stop rail, gauge, controls, keyboard, treadle area, Adjustments, notes. Loads `css/organ.css` and `js/main.js`. |
+| `index.html` | The markup: cabinet with a top bar (name, gauge, Volume/MIDI/All notes off), stop rail with Rank voicing and the Vox Humana fan, Knee swell, keyboard, treadle area, Adjustments, notes. Loads `css/organ.css` and `js/main.js`. |
 | `css/organ.css` | All styles. Colour tokens are in the `:root` block at the top. |
 | `js/main.js` | Entry point: calls each module's setup in order (see below). |
 | `js/state.js` | Shared state: `S` (pressure, swell, tone and the saved choices), `stops`, `voices`, `store` (localStorage), `halfOf`. |
@@ -16,6 +16,7 @@ exists. For *why* things are built this way, see [decisions.md](decisions.md).
 | `js/keys.js` | On-screen keyboard, octave couplers (`press`/`release`/`recouple`), computer keys, MIDI. |
 | `js/stops.js` | Stop rail and the divided-stops selector. |
 | `js/treadles.js` | The two treadles: ADSR state (`ped`), pedals, envelope pictures, `gateOn`/`gateOff`. |
+| `js/info.js` | The info buttons: `setupInfo()` adds an "i" button to every `[data-info]` section's `.info-host` heading, which shows or hides that section's own `.sub` and `.hint` text (D24). |
 | `js/autoplay.js` | Pedal autoplay: the pattern editor, its saved pattern, and `stepAutoplay()`, which the control loop calls each frame to press and lift the treadles through `gateOn`/`gateOff`. |
 | `js/wind-loop.js` | The per-frame control loop (`frame`), the gauge and readouts. |
 | `js/core/*.js` | Pure maths, with no page or audio access: `ranks.js` (ranks, harmonic recipes, brightness compensation, Celeste), `reeds.js` (per-reed scatter, wind response and Unison pull), `wind.js` (loudness, brightness and pitch against pressure, treadle envelopes), `speech.js` (how a reed speaks: onset time and shape, tone bloom, the tone shelf's position), `fan.js` (the spinning-fan wave), `output.js` (volume, cabinet bass corner, limiter make-up, soft clip), `autoplay.js` (meters, pattern editing and reshaping, which treadle is down at a given time). |
@@ -58,7 +59,8 @@ define constants and functions. All work happens in the setup functions, which
 3. `setupKeys()`: builds the keyboard and attaches pointer, computer-key and MIDI input.
 4. `setupTreadles()`: builds the pedals and envelope controls.
 5. `setupAutoplay()`: builds the pedal autoplay editor from the saved pattern.
-6. `startWindLoop()`: draws the gauge and starts `frame()`.
+6. `setupInfo()`: adds the info buttons and hides the explanations each section has hidden.
+7. `startWindLoop()`: draws the gauge and starts `frame()`.
 
 Keep it that way. If a module needs something at load time, it may only use
 `js/core` and `state.js`, which don't import anything else. The audio graph is
