@@ -1,67 +1,35 @@
-# Reed organ: notes for working in this repository
+# Reed organ: working in this repository
 
-The owner reviews and merges pull requests and does not otherwise work in the
-repo. Every change arrives as a PR from a branch; never push to `main`.
+A playable parlor reed organ that runs in the browser, published with GitHub Pages
+from `main`. The owner reviews and merges pull requests and does not otherwise
+work in the repo.
 
-## Layout
+## Read first
 
-- `index.html`: the entire instrument (markup, CSS and the Web Audio script in
-  one file). Keep it a single self-contained file with no build step. The only
-  external resource allowed is Google Fonts.
-- `scripts/check.mjs`: dependency-free checks that run in CI on every PR.
-  Run `node scripts/check.mjs` before opening a PR.
-- `.github/workflows/check.yml`: runs the check on PRs and on `main`.
-- Publishing: GitHub Pages deploys from the root of `main` (branch source,
-  not Actions), so every merge goes live within a minute or two. `.nojekyll`
-  turns off Jekyll processing. Since nothing re-checks the page at deploy
-  time, the PR check is the only gate: never open a PR with a failing check.
+- `docs/decisions.md` lists the owner's preferences and why the sound works the way it does. Read it before changing anything audible.
+- `docs/architecture.md` covers the files, signal flow, control loop, state, and where each feature lives.
+- `README.md` is the player-facing description. Keep it in step with features.
+
+## Rules
+
+- Every change arrives as a PR from a branch made from the latest `main`. Never push to `main`. Before starting, check whether earlier PRs have merged.
+- Keep the instrument static and build-free (decision D1). The only external resource allowed is Google Fonts.
+- Run `node scripts/check.mjs` before opening a PR. Pages deploys every merge without re-checking, so never open a PR with a failing check.
+- Defaults keep the current sound unless the owner asked for a change.
+- For anything audible, measure the rendered audio and put the numbers in the PR (D9).
+- Add a `docs/decisions.md` entry for every design choice. Update `docs/architecture.md` when structure or names change.
 
 ## Conventions
 
-- Colours live as tokens in the `:root` block at the top of the `<style>`. The
-  design is deliberately single-theme (dark walnut cabinet).
-- User settings persist through the `store` helper (localStorage wrapped in
-  try/catch). New sliders should save and restore their value the same way.
-- Audio graph: rank buses (one set per half: `buses.bass[i]`, `buses.treble[i]`;
-  a note routes by `halfOf(m)`) → swell lowpass → tilt high-shelf → wind gain →
-  tremolo gain → fan stage (low band straight through; upper band via `shadow`
-  gain, `refl` delay mix and `hiPan`) → body EQ →
-  cabinet convolver (dry/wet) → room convolver (dry/wet) → compressor → output.
-  Breath noise joins at the tremolo. Wind pressure (0–1, gauge reads
-  `pressure × 3.6″`) drives level and pitch in the `frame()` loop. Tone follows
-  a smoothed copy (`tonePress`, response time `toneRespS`). In the `tilt` model
-  the lowpass sits still (only the knee swell moves it) and the high-shelf gain
-  follows the wind; in the `sweep` model the lowpass cutoff follows the wind
-  and the shelf is flat. `sweep` at depth 100% with a 20 ms response reproduces
-  the original sound.
-- Vox Humana: the fan stage splits the sound at `fanLow.frequency` (Blade size)
-  into a low band and a complementary upper band (input minus low band), so the
-  two sum back exactly when the fan is still. `lfo` (blade-passing wave) drives
-  `lfoShadow` → `shadow.gain`, plus the legacy `lfoAmp` (whole-sound wobble on
-  `trem.gain`) and `lfoFilt` (lid filter detune). `lfoPan` (a cosine started at
-  the same moment, so they stay phase-locked) drives `lfoRefl` → `refl.delayTime`
-  and `lfoPanAmt` → `hiPan.pan`. `applyVox()` sets all depths and the fan speed,
-  spinning up on draw and coasting down on retire.
-  The Spinning fan shape is one turn of a two-blade fan, so `lfoFreq()` is half
-  the displayed speed for that shape.
-- Stop state is `stops.bass[id]` / `stops.treble[id]` plus `stops.vox`,
-  `stops.sub` and `stops.sup` (octave couplers). When stops are not divided,
-  both halves are kept identical.
-- Input (pointer, computer keys, MIDI) calls `press(m)` / `release(m)`, never
-  `noteOn` / `noteOff` directly; `press` adds coupled octaves and `recouple()`
-  updates held keys when a coupler changes. Voices are reference-counted, so a
-  note held both directly and through a coupler sounds once.
-- Each reed's tuning error is `reedScatter(i, m)` and its wind response is
-  `reedWindResp(i, m)`, both from `reedRand` (a hash of rank, key and
-  `reedSeed`). Every oscillator has its own gain node between `windPitch` and its
-  detune (`v.winds[i]`); `rewind()` updates them on sounding notes. There are
-  no fixed per-rank detunes any more (`det` is 0 except via the Celeste).
-- Rank voicing lives in `voicing[i].level|tune|bright`. Use `rankLevel(i)` for a
-  rank's bus gain (it includes the brightness loudness compensation),
-  `rankCents(i, f, m)` for its pitch offset, and `rankWave(i)` for its waveform.
-  `retune(i)` and `revoice(i)` update notes that are already sounding.
-- New sliders: use `bindSlider(id, storeKey, default, format, onChange, map)`.
-  The input id ends in `Amt` and its `<output>` uses the same name ending in `Out`.
-- Keep the "Things to listen for" notes and the README in step with features.
-- In a PR description, say what changed in terms of what the player hears or
-  does, and list anything to try after merging.
+- Colours are tokens in the `:root` block. The design is deliberately single-theme (dark walnut cabinet).
+- New sliders use `bindSlider(id, storeKey, default, format, onChange, map)`. The input id ends in `Amt` and its `<output>` ends in `Out`. Settings persist through `store`.
+- Input calls `press(m)` / `release(m)`, never `noteOn` / `noteOff` directly.
+- Keep the "Things to listen for" notes in step with features.
+- PR descriptions say what the player hears or does differently, include measurements, and end with "Try after merging". Write them for a reader who won't look at the code.
+
+## Tooling notes for Claude sessions
+
+- GitHub GraphQL is blocked from these sessions, so `gh pr create` fails. Open PRs with the REST API: `gh api -X POST repos/paperclipsoftware/reedorgan/pulls --input pr.json` (JSON with `title`, `head`, `base`, `body`). Check CI with `gh api repos/paperclipsoftware/reedorgan/commits/<branch>/check-runs`.
+- The Pages settings API is blocked too. Pages changes need the owner.
+- Chromium for Playwright is preinstalled at `/opt/pw-browsers`. Launch with `--autoplay-policy=no-user-gesture-required` so Web Audio runs headless.
+- `github.io` isn't reachable from the session, so test against the local files.

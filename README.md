@@ -70,3 +70,5 @@ dependencies. Open it in a browser to run it locally.
 - Merging to `main` publishes the page automatically. GitHub Pages serves the
   repository root of `main` directly (Settings → Pages → Deploy from a branch);
   `.nojekyll` tells it to serve the files as they are.
+- `docs/architecture.md` explains how the instrument is built, and
+  `docs/decisions.md` records why it sounds the way it does.
