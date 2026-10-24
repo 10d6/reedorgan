@@ -132,6 +132,8 @@ function onMidi(ev) {
       if (!sustain) { sustained.forEach(release); sustained.clear(); }
     } else if (d1 === 11 || d1 === 4) {
       ctl.swell.set(Math.round(d2 / 127 * 100));
+    } else if (d1 === 2) {
+      ctl.directAir.set(Math.round(d2 / 127 * 36));   // a breath controller sets Direct wind (D26)
     } else if (d1 === 123 || d1 === 120) {
       allNotesOff();
     }

@@ -46,9 +46,16 @@ function frame(now) {
   const help = ctl.helperRate();
   inflow += help * Math.max(0, Math.min(1, (.8 - S.pressure) / .12));   // helper eases off near full
 
-  S.pressure += (inflow - drain) * dt / ctl.res.value;                    // a bigger reservoir changes more slowly
-  if (S.pressure > 1) { S.pressure = 1; S.reliefT = .7; }
-  S.pressure = Math.max(0, S.pressure); S.reliefT = Math.max(0, S.reliefT - dt);
+  if (S.directWind) {
+    // Direct wind (D26): the slider sets the reservoir's pressure, and nothing
+    // else moves it. A short glide stops sudden jumps from clicking.
+    S.pressure += (ctl.directAir.value - S.pressure) * Math.min(1, dt / .06);
+    S.reliefT = 0;
+  } else {
+    S.pressure += (inflow - drain) * dt / ctl.res.value;                    // a bigger reservoir changes more slowly
+    if (S.pressure > 1) { S.pressure = 1; S.reliefT = .7; }
+    S.pressure = Math.max(0, S.pressure); S.reliefT = Math.max(0, S.reliefT - dt);
+  }
 
   // tone follows a smoothed copy of the wind so treadle ripples don't flutter it
   S.tonePress += (S.pressure - S.tonePress) * Math.min(1, dt / ctl.toneResp.value);
@@ -73,6 +80,7 @@ function frame(now) {
     }
     let msg = '', ok = false;
     if (!S.started) { msg = 'Press a key to start'; ok = true; }
+    else if (S.directWind) { msg = 'Direct wind'; ok = true; }
     else if (S.reliefT > 0) msg = 'Relief valve venting';
     else if (S.pressure < .05 && sounding) msg = 'Out of wind. Pump!';
     else if (S.pressure < .2) msg = 'Wind is low';

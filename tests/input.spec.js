@@ -142,3 +142,33 @@ test("Easy wind: a full-organ chord drains like three reeds, and is remembered (
   await page.reload();
   await expect(page.locator("#easyWind")).toBeChecked();
 });
+
+test("Direct wind: the slider alone sets the reservoir; treadles, autoplay and playing don't move it (D26)", async ({ page }) => {
+  await openOrgan(page, { quiet: false });                      // autoplay on, helper 2%
+  await expect(page.locator("#directOn")).not.toBeChecked();
+  await expect(page.locator("#airAmt")).toBeDisabled();
+  await page.locator("#directOn").check();
+  await expect(page.locator("#airAmt")).toBeEnabled();
+  await setSlider(page, "airAmt", 30);
+  for (const s of ["Bourdon 16′", "Celeste 8′", "Principal 4′"]) await toggleStop(page, s);
+  await hold(page, "z", "b", "q", "e", "t", "i");              // a big chord that would drain the wind
+  await page.waitForTimeout(1500);
+  expect(await readout(page, "rWind")).toBe("3.0″");
+  await expect(page.locator("#flowR")).toHaveText("idle");      // autoplay rests
+  await expect(page.locator("#status")).toHaveText("Direct wind");
+  for (let i = 0; i < 4; i++) { const k = i % 2 ? "ArrowRight" : "ArrowLeft"; await page.keyboard.down(k); await page.waitForTimeout(120); await page.keyboard.up(k); }
+  expect(await readout(page, "rWind")).toBe("3.0″");           // pumping adds nothing
+  const loud = await rms(page);
+  await setSlider(page, "airAmt", 0);
+  await page.waitForTimeout(600);
+  expect(await readout(page, "rWind")).toBe("0.0″");
+  await page.waitForTimeout(1800);                              // let the room's reverb tail die away
+  expect(await rms(page)).toBeLessThan(loud * 0.02);             // no wind, no sound
+  await page.click("#midiBtn");
+  await page.evaluate(() => window.__midi(0xb0, 2, 127));       // breath controller full
+  await expect(page.locator("#airOut")).toHaveText("3.6″");
+  await letGo(page, "z", "b", "q", "e", "t", "i");
+  await page.reload();
+  await expect(page.locator("#directOn")).toBeChecked();
+  await expect(page.locator("#airOut")).toHaveText("3.6″");
+});

@@ -46,6 +46,11 @@
         <input type="range" id="volumeAmt" min="0" max="150" step="1" value="100">
         <p class="sub">The overall level at your speakers. Above 100%, a limiter keeps the loudest chords from distorting.</p>
       </div>
+      <div class="field direct" data-info="direct">
+        <div class="field-head info-host"><label class="check" for="directOn"><input type="checkbox" id="directOn"> Direct wind</label><output id="airOut" for="airAmt">2.0″</output></div>
+        <input type="range" id="airAmt" min="0" max="36" step="1" value="20" disabled>
+        <p class="sub">Set the air in the reservoir yourself. While this is on, the slider is the only thing that moves the wind: the treadles, autoplay and helper pump add none, and playing uses none. 2.0″ is normal wind. A MIDI breath controller (CC2) moves it too.</p>
+      </div>
       <div class="midi-row">
         <button class="btn" id="midiBtn" type="button">Connect MIDI</button>
         <button class="btn" id="panicBtn" type="button" title="Silences every note (Esc)">All notes off</button>

@@ -4,7 +4,7 @@
 // from the control loop (stepAutoplay).
 
 import { METERS, MAX_MEASURES, DEFAULT_PATTERN, REST, LEFT, RIGHT, TIE, normalise, reshape, nextCell, cellSeconds, pedalsAt } from './core/autoplay.js';
-import { store } from './state.js';
+import { S, store } from './state.js';
 import { ctx } from './audio.js';
 import { ctl } from './controls.js';
 import { ped, gateOn, gateOff } from './treadles.js';
@@ -66,7 +66,8 @@ function letGo() {
 // Autoplay waits for the sound to start (the first key, pedal or slider touch),
 // because browsers only allow sound after the player does something.
 export function stepAutoplay() {
-  if (!A.on || !ctx) { if (held.L || held.R || nowIdx >= 0) letGo(); t0 = null; return; }
+  // Direct wind takes over the air (D26), so autoplay rests while it's on.
+  if (!A.on || !ctx || S.directWind) { if (held.L || held.R || nowIdx >= 0) letGo(); t0 = null; return; }
   const t = now();
   if (t0 === null) t0 = t;
   const want = pedalsAt(A.cells, cellSeconds(ctl.tempo.value), t - t0);
@@ -76,7 +77,7 @@ export function stepAutoplay() {
   }
   showPlayhead(want.index);
 }
-export const autoplayOn = () => A.on && !!ctx;
+export const autoplayOn = () => A.on && !!ctx && !S.directWind;
 
 export function setupAutoplay() {
   A = normalise(store.get('autoplay', DEFAULT_PATTERN));
