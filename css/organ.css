@@ -56,6 +56,8 @@ button{font:inherit;color:inherit}
 }
 @media (max-width:560px){.topbar{grid-template-columns:1fr}}
 .top-ctrls{display:flex;flex-direction:column;gap:10px;min-width:0}
+.direct .check{color:var(--text);font-family:var(--f-label);font-size:15px}
+.direct input[type=range]:disabled{opacity:.4}
 
 /* Name board */
 .nameboard{display:flex;flex-direction:column;align-items:flex-start;gap:4px;text-align:left;min-width:0}

@@ -175,3 +175,9 @@ These come from the owner's own feedback and apply to every change:
 **Why:** the owner saw the gauge jump when the status changed, and asked for the rest.
 **Measured** (D8 method: held A3, Diapason alone, fan spun up, three 2 s runs): old defaults bass 0.1 dB, overall 0.2 dB, treble flicker 6.0 dB; new defaults bass 0.0 dB, overall 0.1 dB, treble flicker 6.1 dB. The deeper blade shadow and the lower shimmer even out, so the flicker is as deep but faster. Treadle noise at 30% is 6 dB quieter.
 **Test changed:** the settings test now opens the Vox Humana panel before choosing the fan shape, as a player would, and checks the panel stays open after a reload.
+
+## D26. Direct wind (trial)
+
+**Chosen:** a **Direct wind** switch with a slider in the top bar, under Volume (off by default; slider 0–3.6″ on the gauge, default 2.0″; both saved, as `reed-directWind` and `reed-directAir`). While it's on, the slider sets the reservoir's pressure outright, with a 60 ms glide so a sudden move doesn't click: the treadles, autoplay and the helper pump add no air, playing uses none, and the relief valve never vents. Autoplay rests (its treadles stay still), the status line reads *Direct wind*, and everything that follows the wind (loudness, tone, pitch drift, speech speed, breath noise) follows the slider. A MIDI breath controller (CC2) moves the slider, whether or not Direct wind is on.
+**Why:** the owner wants to try controlling the air directly, and may later want the treadles and their controls shown as disabled while it's on. For now the treadles still move when pressed; they just don't affect the wind.
+**Revisit if:** the owner keeps it. Then: disable or fold the treadle, autoplay, helper and reservoir controls while it's on, and consider whether the knee swell or an expression pedal should drive it.

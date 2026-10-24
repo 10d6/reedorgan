@@ -3,7 +3,7 @@
 
 import { RANKS } from './core/ranks.js';
 import { retime } from './autoplay.js';
-import { HELPER_MAX } from './core/wind.js';
+import { HELPER_MAX, GMAX } from './core/wind.js';
 import { volumeGain, bassCutHz } from './core/output.js';
 import { S, store } from './state.js';
 import { initAudio, applyStops, applyVox, applyMix, applyOutput, setFanShape, retune, rewind, revoice, updateComp, ctx } from './audio.js';
@@ -47,6 +47,13 @@ export function setupControls() {
   /* ---- swell and wind ---- */
   // Volume: 100% is the level before D20; the slider is squared so it feels even.
   ctl.volume = bindSlider('volumeAmt', 'volume', 100, v => v === 0 ? 'Silent' : v + '%', () => applyOutput(), volumeGain);
+  // Direct wind (D26): a switch and a slider that set the reservoir's pressure
+  // outright, in tenths of an inch on the gauge (0–3.6″; 2.0″ is normal wind).
+  ctl.directAir = bindSlider('airAmt', 'directAir', 20, v => (v / 10).toFixed(1) + '″', null, v => v / 10 / (GMAX * .9));
+  const directEl = $('directOn');
+  const syncDirect = () => { directEl.checked = S.directWind; ctl.directAir.el.disabled = !S.directWind; };
+  directEl.addEventListener('change', () => { initAudio(); S.directWind = directEl.checked; store.set('directWind', S.directWind); syncDirect(); });
+  syncDirect();
   ctl.swell = bindSlider('swellAmt', 'swell', 0, v => v === 0 ? 'Closed' : v === 100 ? 'Full' : v + '%', null, v => v / 100);
   ctl.res = bindSlider('resAmt', 'reservoir', 45, fmtX, null, logMap(.4, 3));
   ctl.sens = bindSlider('sensAmt', 'sensitivity', 10, v => v + ' ¢');

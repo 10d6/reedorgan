@@ -20,6 +20,7 @@ export const S = {
   splitMode: saved('split', 'none', v => !!SPLITS[v]),
   compass: saved('compass', 'full', v => v === 'full' || v === 'organ'),
   easyWind: saved('easyWind', false, v => typeof v === 'boolean'),
+  directWind: saved('directWind', false, v => typeof v === 'boolean'),
   toneModel: saved('toneModel', 'tilt', v => v === 'tilt' || v === 'sweep'),
   voxShape: saved('voxShape', 'sine', v => v === 'sine' || v === 'fan'),
   reedSeed: store.get('reedSeed', 1),
