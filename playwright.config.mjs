@@ -5,6 +5,7 @@ import { defineConfig } from "@playwright/test";
 // and make the real-time audio measurements noisy.
 export default defineConfig({
   testDir: "tests",
+  testMatch: "*.spec.js",          // unit tests in tests/unit run under node --test
   timeout: 60_000,
   workers: 1,
   fullyParallel: false,
