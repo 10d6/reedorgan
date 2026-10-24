@@ -47,15 +47,25 @@ button{font:inherit;color:inherit}
   display:flex;flex-direction:column;gap:clamp(18px,3vw,28px);
 }
 
+/* Top bar (D24): name board on the left, the wind gauge beside it, then volume,
+   MIDI and All notes off on the right. Wraps to two rows, then one column. */
+.topbar{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(220px,280px);gap:16px 28px;align-items:center}
+@media (max-width:900px){
+  .topbar{grid-template-columns:minmax(0,1fr) minmax(220px,280px)}
+  .topbar .nameboard{grid-column:1 / -1}
+}
+@media (max-width:560px){.topbar{grid-template-columns:1fr}}
+.top-ctrls{display:flex;flex-direction:column;gap:10px;min-width:0}
+
 /* Name board */
-.nameboard{display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center}
+.nameboard{display:flex;flex-direction:column;align-items:flex-start;gap:4px;text-align:left;min-width:0}
 .plate{
-  font-family:var(--f-display);font-size:clamp(28px,5vw,46px);letter-spacing:.04em;line-height:1.05;
+  font-family:var(--f-display);font-size:clamp(28px,4.4vw,42px);letter-spacing:.04em;line-height:1.05;
   color:var(--brass);text-shadow:0 1px 0 #000,0 -1px 0 rgba(255,230,170,.18);
   text-wrap:balance;margin:0;font-weight:400;
 }
-.subplate{font-family:var(--f-label);font-style:italic;color:var(--muted);font-size:15px;margin:0}
-.fret{width:min(320px,70%);height:10px;opacity:.7}
+.subplate{font-family:var(--f-label);font-style:italic;color:var(--muted);font-size:15px;margin:0;text-wrap:balance}
+.fret{width:min(240px,80%);height:10px;opacity:.7}
 
 /* Recessed rails (stops, envelopes) */
 .rail{
@@ -102,14 +112,15 @@ select{
 @media (max-width:480px){.vox-grid{grid-template-columns:1fr}}
 
 /* Console: gauge + controls */
-.console{display:flex;flex-wrap:wrap;gap:18px 32px;align-items:center;justify-content:space-between}
+.console{display:flex}
 .gauge-wrap{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
 .gauge{width:180px;max-width:100%;height:auto;display:block}
 .readouts{display:grid;grid-template-columns:auto auto;gap:2px 12px;font-family:var(--f-label);font-size:14px;color:var(--muted);align-items:baseline}
 .readouts b{font-family:var(--f-body);font-weight:500;color:var(--text);font-variant-numeric:tabular-nums;font-size:16px;text-align:right}
 .status{grid-column:1 / -1;min-height:1.4em;color:var(--warn);font-style:italic;font-size:14px}
 .status.ok{color:var(--muted)}
-.ctrls{display:flex;flex-direction:column;gap:12px;font-size:15px;flex:1 1 300px;max-width:420px;min-width:0}
+.ctrls{display:grid;grid-template-columns:minmax(0,420px) minmax(0,1fr);gap:12px 32px;align-items:start;font-size:15px;flex:1;min-width:0}
+@media (max-width:680px){.ctrls{grid-template-columns:1fr}}
 .field{display:flex;flex-direction:column;gap:4px}
 .field-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
 .field-head label{font-family:var(--f-label);font-size:15px}
@@ -213,7 +224,20 @@ kbd{font-family:var(--f-body);font-size:13px;border:1px solid var(--brass-dim);b
 .field select{align-self:flex-start}
 .adjust-grid .rail{display:flex;flex-direction:column;gap:14px;min-width:0}
 .adjust-grid .rail-label{margin:0 0 -4px 0}
-.voicing{margin-top:16px}
+.voicing{margin-top:14px;padding-top:10px;border-top:1px solid rgba(201,160,82,.16)}
+
+/* Info buttons (D24): a small brass "i" beside a heading that shows or hides the
+   section's explanations. */
+.info-btn{
+  display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;padding:0;margin-left:8px;
+  border-radius:50%;border:1px solid var(--brass-dim);background:#2e1a10;cursor:pointer;vertical-align:middle;
+  font-family:Georgia,serif;font-style:italic;font-weight:700;font-size:12px;line-height:1;color:var(--muted);
+  text-transform:none;letter-spacing:0;flex:none;
+}
+.info-btn:hover{border-color:var(--brass);color:var(--text)}
+.info-btn[aria-pressed="true"]{background:var(--brass);border-color:var(--brass);color:var(--wood-deep)}
+.field-head.info-host{justify-content:flex-start}
+.field-head.info-host .info-btn{margin:0 auto 0 8px;align-self:center}
 .voicing-body{display:flex;flex-direction:column;gap:14px;margin-top:12px}
 .voicing summary{
   cursor:pointer;font-family:var(--f-label);font-size:12px;letter-spacing:.16em;text-transform:uppercase;

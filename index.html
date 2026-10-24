@@ -12,10 +12,44 @@
 </head>
 <body>
 <div class="cabinet">
-  <header class="nameboard">
-    <svg class="fret" viewBox="0 0 320 10" aria-hidden="true"><path d="M0 5 H130 M190 5 H320" stroke="#c9a052" stroke-width="1"/><path d="M140 5 l10 -4 l10 4 l10 -4 l10 4 l-10 4 l-10 -4 l-10 4 z" fill="none" stroke="#c9a052" stroke-width="1"/></svg>
-    <h1 class="plate">Parlor Reed Organ</h1>
-    <p class="subplate">Five sets of free reeds · foot-pumped wind · fan tremolo</p>
+  <header class="topbar">
+    <div class="nameboard">
+      <svg class="fret" viewBox="0 0 320 10" aria-hidden="true"><path d="M0 5 H130 M190 5 H320" stroke="#c9a052" stroke-width="1"/><path d="M140 5 l10 -4 l10 4 l10 -4 l10 4 l-10 4 l-10 -4 l-10 4 z" fill="none" stroke="#c9a052" stroke-width="1"/></svg>
+      <h1 class="plate">Parlor Reed Organ</h1>
+      <p class="subplate">Five sets of free reeds · foot-pumped wind · fan tremolo</p>
+    </div>
+    <div class="gauge-wrap">
+      <svg class="gauge" id="gauge" viewBox="0 0 200 122" role="img" aria-label="Wind pressure gauge">
+        <defs>
+          <radialGradient id="dial" cx="50%" cy="85%" r="85%"><stop offset="0" stop-color="#f3e8cc"/><stop offset="1" stop-color="#cdbb92"/></radialGradient>
+        </defs>
+        <path d="M10 112 A90 90 0 0 1 190 112 Z" fill="url(#dial)" stroke="#c9a052" stroke-width="4"/>
+        <path id="redzone" fill="none" stroke="#a13a4a" stroke-width="6"/>
+        <g id="ticks"></g>
+        <text x="100" y="86" text-anchor="middle" font-family="IM Fell English, Georgia, serif" font-style="italic" font-size="11" fill="#5b3d26">in. water</text>
+        <line id="needle" x1="100" y1="112" x2="100" y2="34" stroke="#2a1a10" stroke-width="2.5" stroke-linecap="round"/>
+        <circle cx="100" cy="112" r="7" fill="#c9a052" stroke="#2a1a10" stroke-width="1.5"/>
+      </svg>
+      <div class="readouts" aria-live="off">
+        <span>Wind</span><b id="rWind">2.0″</b>
+        <span>Pitch</span><b id="rPitch">0 ¢</b>
+        <span>Reeds</span><b id="rReeds">0</b>
+        <span>Use</span><b id="rUse">0.02/s</b>
+        <span class="status ok" id="status">Press a key to start</span>
+      </div>
+    </div>
+    <div class="top-ctrls" data-info="top">
+      <div class="field">
+        <div class="field-head info-host"><label for="volumeAmt">Volume</label><output id="volumeOut" for="volumeAmt">100%</output></div>
+        <input type="range" id="volumeAmt" min="0" max="150" step="1" value="100">
+        <p class="sub">The overall level at your speakers. Above 100%, a limiter keeps the loudest chords from distorting.</p>
+      </div>
+      <div class="midi-row">
+        <button class="btn" id="midiBtn" type="button">Connect MIDI</button>
+        <button class="btn" id="panicBtn" type="button" title="Silences every note (Esc)">All notes off</button>
+      </div>
+      <p class="midi-status" id="midiStatus">Not connected</p>
+    </div>
   </header>
 
   <section class="rail" aria-label="Stops">
@@ -30,8 +64,16 @@
       </label>
     </div>
     <div class="stop-groups" id="stops"></div>
-    <div class="vox-panel">
-      <p class="rail-label">Vox Humana fan</p>
+    <details class="voicing" id="voicing" data-info="voicing">
+      <summary class="info-host">Rank voicing</summary>
+      <div class="voicing-body">
+        <p class="sub">Regulate each set of reeds on its own: how loud it speaks, a few cents of fine tuning, and how bright its tone is. Changes apply to notes already sounding.</p>
+        <div class="voicing-grid" id="voicingGrid"></div>
+        <div><button class="btn" id="voicingReset" type="button">Restore factory voicing</button></div>
+      </div>
+    </details>
+    <div class="vox-panel" data-info="vox">
+      <p class="rail-label info-host">Vox Humana fan</p>
       <div class="vox-grid">
         <div class="field">
           <div class="field-head"><label for="voxRate">Speed</label><output id="voxOut" for="voxRate">5.6 Hz</output></div>
@@ -74,45 +116,12 @@
     </div>
   </section>
 
-  <section class="console">
-    <div class="gauge-wrap">
-      <svg class="gauge" id="gauge" viewBox="0 0 200 122" role="img" aria-label="Wind pressure gauge">
-        <defs>
-          <radialGradient id="dial" cx="50%" cy="85%" r="85%"><stop offset="0" stop-color="#f3e8cc"/><stop offset="1" stop-color="#cdbb92"/></radialGradient>
-        </defs>
-        <path d="M10 112 A90 90 0 0 1 190 112 Z" fill="url(#dial)" stroke="#c9a052" stroke-width="4"/>
-        <path id="redzone" fill="none" stroke="#a13a4a" stroke-width="6"/>
-        <g id="ticks"></g>
-        <text x="100" y="86" text-anchor="middle" font-family="IM Fell English, Georgia, serif" font-style="italic" font-size="11" fill="#5b3d26">in. water</text>
-        <line id="needle" x1="100" y1="112" x2="100" y2="34" stroke="#2a1a10" stroke-width="2.5" stroke-linecap="round"/>
-        <circle cx="100" cy="112" r="7" fill="#c9a052" stroke="#2a1a10" stroke-width="1.5"/>
-      </svg>
-      <div class="readouts" aria-live="off">
-        <span>Wind</span><b id="rWind">2.0″</b>
-        <span>Pitch</span><b id="rPitch">0 ¢</b>
-        <span>Reeds</span><b id="rReeds">0</b>
-        <span>Use</span><b id="rUse">0.02/s</b>
-        <span class="status ok" id="status">Press a key to start</span>
-      </div>
-    </div>
-
+  <section class="console" aria-label="Playing" data-info="play">
     <div class="ctrls">
       <div class="field">
-        <div class="field-head"><label for="volumeAmt">Volume</label><output id="volumeOut" for="volumeAmt">100%</output></div>
-        <input type="range" id="volumeAmt" min="0" max="150" step="1" value="100">
-        <p class="sub">The overall level at your speakers. Above 100%, a limiter keeps the loudest chords from distorting.</p>
-      </div>
-      <div class="field">
-        <div class="field-head"><label for="swellAmt">Knee swell</label><output id="swellOut" for="swellAmt">Closed</output></div>
+        <div class="field-head info-host"><label for="swellAmt">Knee swell</label><output id="swellOut" for="swellAmt">Closed</output></div>
         <input type="range" id="swellAmt" min="0" max="100" step="1" value="0">
         <p class="sub">Opens the swell lid: louder and brighter, but it uses more wind. A MIDI expression pedal (CC11 or CC4) moves it too.</p>
-      </div>
-      <div class="field">
-        <div class="midi-row">
-          <button class="btn" id="midiBtn" type="button">Connect MIDI keyboard</button>
-          <button class="btn" id="panicBtn" type="button" title="Silences every note (Esc)">All notes off</button>
-          <p class="midi-status" id="midiStatus">Not connected</p>
-        </div>
       </div>
       <p class="hint">Hold <kbd>←</kbd> <kbd>→</kbd> (or <kbd>Space</kbd>) to work the treadles. Play with <kbd>Z</kbd>–<kbd>M</kbd> for the low octave and <kbd>Q</kbd>–<kbd>U</kbd> and up for the middle. <kbd>Esc</kbd> silences everything.</p>
     </div>
@@ -122,18 +131,18 @@
     <div class="keys" id="keys"></div>
   </section>
 
-  <section aria-label="Treadles">
+  <section aria-label="Treadles" data-info="treadles">
     <div class="sec-head">
-      <h2>Treadles</h2>
+      <h2 class="info-host">Treadles</h2>
       <div class="sec-checks">
         <label class="check" for="easyWind"><input type="checkbox" id="easyWind"> Easy wind</label>
         <label class="check" for="link"><input type="checkbox" id="link" checked> Same envelope for both feet</label>
       </div>
     </div>
     <p class="sub" style="margin:0 0 14px"><strong>Easy wind</strong> charges the bellows for no more than three notes on a single stop, however much you play, so full chords and extra stops don't need harder pumping. The sound doesn't change. Each treadle feeds air through its own envelope. Pressing starts the attack; holding keeps the sustain flowing; letting go starts the release. Times run up to 30 seconds.</p>
-    <div class="rail autoplay" id="autoplay">
+    <div class="rail autoplay" id="autoplay" data-info="autoplay">
       <div class="auto-head">
-        <p class="rail-label">Pedal autoplay</p>
+        <p class="rail-label info-host">Pedal autoplay</p>
         <label class="check" for="autoOn"><input type="checkbox" id="autoOn" checked> Pump for me</label>
       </div>
       <div class="auto-ctrls">
@@ -156,12 +165,12 @@
     <div class="feet" id="feet"></div>
   </section>
 
-  <section aria-label="Adjustments">
-    <div class="sec-head"><h2>Adjustments</h2></div>
+  <section aria-label="Adjustments" data-info="adjust">
+    <div class="sec-head"><h2 class="info-host">Adjustments</h2></div>
     <p class="sub" style="margin:0 0 14px">The regulator's bench: how the wind behaves, how the reeds speak, and the space around the organ.</p>
     <div class="adjust-grid">
-      <div class="rail">
-        <p class="rail-label">Wind</p>
+      <div class="rail" data-info="wind">
+        <p class="rail-label info-host">Wind</p>
         <div class="field">
           <div class="field-head"><label for="helper">Helper pump</label><output id="helperOut" for="helper">2% · 0.01/s</output></div>
           <input type="range" id="helper" min="0" max="100" step="1" value="2">
@@ -183,8 +192,8 @@
           <p class="sub">Reeds are tuned at normal wind, but each one wanders a little differently as the wind rises and falls, low reeds more than high. Reeds on different keys drift apart and back together as you pump; reeds held in step by Unison pull drift together.</p>
         </div>
       </div>
-      <div class="rail">
-        <p class="rail-label">Wind tone</p>
+      <div class="rail" data-info="wind-tone">
+        <p class="rail-label info-host">Wind tone</p>
         <div class="field">
           <label for="toneModel" class="field-label">Tone model</label>
           <select id="toneModel">
@@ -209,8 +218,8 @@
           <p class="sub">How quickly the tone follows the wind. Slower smooths out the ripple from each treadle stroke.</p>
         </div>
       </div>
-      <div class="rail">
-        <p class="rail-label">Reeds</p>
+      <div class="rail" data-info="reeds">
+        <p class="rail-label info-host">Reeds</p>
         <div class="field">
           <div class="field-head"><label for="speechAmt">Speech speed</label><output id="speechOut" for="speechAmt">1.0×</output></div>
           <input type="range" id="speechAmt" min="0" max="100" step="1" value="33">
@@ -251,8 +260,8 @@
           <p class="sub">Reeds on the same key that sound in unison or octaves, and are tuned within this many cents of each other, pull into step and sound as one instead of beating slowly. The Celeste never locks. Off lets every reed beat freely.</p>
         </div>
       </div>
-      <div class="rail">
-        <p class="rail-label">Case and room</p>
+      <div class="rail" data-info="case-and-room">
+        <p class="rail-label info-host">Case and room</p>
         <div class="field">
           <div class="field-head"><label for="cabAmt">Cabinet</label><output id="cabOut" for="cabAmt">45%</output></div>
           <input type="range" id="cabAmt" min="0" max="100" step="1" value="45">
@@ -277,14 +286,6 @@
         </div>
       </div>
     </div>
-    <details class="rail voicing" id="voicing">
-      <summary>Rank voicing</summary>
-      <div class="voicing-body">
-        <p class="sub">Regulate each set of reeds on its own: how loud it speaks, a few cents of fine tuning, and how bright its tone is. Changes apply to notes already sounding.</p>
-        <div class="voicing-grid" id="voicingGrid"></div>
-        <div><button class="btn" id="voicingReset" type="button">Restore factory voicing</button></div>
-      </div>
-    </details>
   </section>
 </div>
 
