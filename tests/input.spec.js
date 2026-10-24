@@ -1,6 +1,6 @@
 // Playing with the mouse, the computer keyboard, the treadles and a MIDI keyboard.
 import { test, expect } from "@playwright/test";
-import { openOrgan, hold, letGo, keysDown, readout, focusKeys, setSlider, rms } from "./organ.js";
+import { openOrgan, hold, letGo, keysDown, readout, focusKeys, setSlider, rms, toggleStop } from "./organ.js";
 
 test("clicking and dragging across keys plays them in turn", async ({ page }) => {
   await openOrgan(page);
@@ -125,4 +125,20 @@ test("Keyboard compass: Full range plays deep MIDI notes, Reed organ doesn't (D1
   await midi(0x90, 29, 100); await page.waitForTimeout(500);   // F1, the bottom key
   expect(await page.locator("#rReeds").textContent()).toBe("2");
   await midi(0x80, 29, 0);
+});
+
+test("Easy wind: a full-organ chord drains like three reeds, and is remembered (D23)", async ({ page }) => {
+  await openOrgan(page);                                         // autoplay off, helper 100%
+  for (const s of ["Bourdon 16′", "Celeste 8′", "Principal 4′"]) await toggleStop(page, s);
+  await hold(page, "z", "b", "q", "e", "t", "i");               // six notes × five stops = 30 reeds
+  await page.waitForTimeout(400);
+  expect(await readout(page, "rReeds")).toBe("30");
+  expect(await readout(page, "rUse")).toBe("0.65/s");
+  await page.locator("#easyWind").check();
+  await page.waitForTimeout(300);
+  expect(await readout(page, "rReeds")).toBe("30");             // the reeds still sound
+  expect(await readout(page, "rUse")).toBe("0.08/s");           // but use the air of three
+  await letGo(page, "z", "b", "q", "e", "t", "i");
+  await page.reload();
+  await expect(page.locator("#easyWind")).toBeChecked();
 });

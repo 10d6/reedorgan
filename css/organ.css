@@ -118,6 +118,7 @@ select{
 input[type=range]{width:100%;accent-color:var(--brass);margin:0}
 input[type=checkbox]{accent-color:var(--brass);width:17px;height:17px;margin:0}
 .check{display:flex;gap:10px;align-items:center;cursor:pointer;font-size:14px;color:var(--muted)}
+.sec-checks{display:flex;gap:8px 22px;flex-wrap:wrap}
 .midi-row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
 .btn{
   border:1px solid var(--brass-dim);background:linear-gradient(180deg,#4a2c1c,#2e1a10);border-radius:6px;

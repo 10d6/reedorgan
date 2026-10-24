@@ -12,7 +12,7 @@ changes the organ's loudness, brightness, pitch and how quickly notes speak.
 | --- | --- |
 | Play notes | Click or touch the keys, or use the computer keyboard: `Z`–`M` for the low octave, `Q`–`U` and up for the middle |
 | Pump | **Pedal autoplay** pumps for you from the first note (on by default). Or hold the Left and Right treadles, or hold `←` `→` (alternating fills fastest). `Space` pumps the next foot |
-| Steady wind | Speed up or busy the autoplay rhythm, or raise **Helper pump** under Adjustments (2% by default). If you play more than the wind supplies, it slowly runs out |
+| Steady wind | Tick **Easy wind** (in Treadles) so chords and extra stops use no more air than three notes. Or speed up or busy the autoplay rhythm, or raise **Helper pump** under Adjustments (2% by default). If you play more than the wind supplies, it slowly runs out |
 | Swell | Move the **Knee swell** slider, or use a MIDI expression pedal (CC11 or CC4) |
 | Volume | The **Volume** slider. Above 100% a limiter keeps loud chords clean |
 | Stuck note | **All notes off**, or `Esc` |
@@ -52,6 +52,9 @@ changes the organ's loudness, brightness, pitch and how quickly notes speak.
   beat a Left or Right stroke, a rest, or a tie that holds the stroke longer.
   The default is one bar of 4/4 at 100 bpm: right, left, half-note rest. That
   carries a melody or a three-note chord; fuller playing needs a busier rhythm.
+- **Easy wind**: the bellows charge for no more than three notes on one stop,
+  so full chords and stop changes don't need harder pumping. The sound is the
+  same; off by default.
 - **Treadle envelopes**: each foot has its own attack, decay, sustain and release
   for the airflow, from 5 ms up to 30 s.
 - **Wind behaviour**: loudness rises up to about 2″ on the gauge and then levels
