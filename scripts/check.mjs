@@ -77,8 +77,8 @@ for (const p of modules) {
 }
 
 // ---- 5. element ids
-const markup = html.replace(/<script[\s\S]*?<\/script>/gi, "").replace(/<style[\s\S]*?<\/style>/gi, "");
-const staticIds = [...markup.matchAll(/\sid="([^"]+)"/g)].map((m) => m[1]);
+// The page has no inline script (checked above), so every id="…" in it is an element.
+const staticIds = [...html.matchAll(/\sid="([^"]+)"/g)].map((m) => m[1]);
 const seen = new Set();
 for (const id of staticIds) { if (seen.has(id)) fail(`index.html: duplicate id="${id}"`); seen.add(id); }
 const js = [...source.values()].join("\n");
