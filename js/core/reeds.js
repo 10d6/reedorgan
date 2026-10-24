@@ -18,6 +18,30 @@ export const reedTri = (seed, i, m, salt) => reedRand(seed, i, m, salt) + reedRa
 // This reed's tuning error in cents, for a scatter of ±`spread` cents.
 export const reedError = (seed, i, m, spread) => reedTri(seed, i, m, 1) * spread;
 
+// Unison pull (D14). Reeds on one key that sound in unison or octaves share the
+// same wind chest, and when their tunings are close enough they pull into step
+// and sound as one, rather than beating slowly. Given each reed's settled offset
+// in cents, its wind response and whether it may lock (the Celeste never does,
+// its beat is the point), finds the largest group of lockable reeds whose
+// offsets lie within `range` cents of each other. Group members take the group's
+// average offset and wind response, so they stay locked as the wind moves.
+// Returns new arrays and `locked` flags; a group needs at least two reeds.
+export function lockReeds(cents, winds, lockable, range) {
+  const out = { cents: [...cents], winds: [...winds], locked: cents.map(() => false) };
+  if (!(range > 0)) return out;
+  const idx = cents.map((_, i) => i).filter(i => lockable[i]).sort((a, b) => cents[a] - cents[b] || a - b);
+  let best = [];
+  for (let s = 0, e = 0; s < idx.length; s++) {
+    while (e < idx.length && cents[idx[e]] - cents[idx[s]] <= range) e++;
+    if (e - s > best.length) best = idx.slice(s, e);
+  }
+  if (best.length < 2) return out;
+  const c = best.reduce((a, i) => a + cents[i], 0) / best.length;
+  const w = best.reduce((a, i) => a + winds[i], 0) / best.length;
+  for (const i of best) { out.cents[i] = c; out.winds[i] = w; out.locked[i] = true; }
+  return out;
+}
+
 // How strongly this reed follows the wind's pitch drift (1 = exactly with the
 // organ), for a Drift variation of `variation` (0…1). Bigger, lower reeds move more.
 export function reedWindResponse(seed, i, m, variation) {

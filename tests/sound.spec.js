@@ -12,7 +12,7 @@ async function diapasonA3(page) {
 }
 const settle = (page, ms = 700) => page.waitForTimeout(ms);
 const avg = async (page, fn, n = 8) => { let s = 0; for (let i = 0; i < n; i++) { s += await fn(page); await page.waitForTimeout(40); } return s / n; };
-// average power in a band over 400 ms: 0 = below 400 Hz, 1 = above 2 kHz
+// average power in a band over 400 ms: 0 = below 400 Hz, 1 = above 2 kHz, 3 = below 160 Hz
 const bandPower = (page, k) => page.evaluate((k) => window.__sample(400).then((f) => f.reduce((s, [l, r]) => s + l[k] + r[k], 0) / f.length), k);
 
 test("silent until a key is played, then sounding", async ({ page }) => {
@@ -64,12 +64,15 @@ test("Sub octave coupler adds bass", async ({ page }) => {
   await openOrgan(page);
   await toggleStop(page, "Sub octave coupler");
   await diapasonA3(page);
-  // bass power with the coupler drawn, then retired under the held key
-  const withSub = await bandPower(page, 0);
+  // Power below 160 Hz (the coupled A2's fundamental, 110 Hz; A3 has nothing
+  // there) with the coupler drawn, then retired under the held key. Measured
+  // below 160 Hz because the coupled note starts at its own phase (D14), so its
+  // 2nd harmonic can add to or partly cancel A3's fundamental at 220 Hz.
+  const withSub = await bandPower(page, 3);
   await page.getByRole("button", { name: "Sub octave coupler", exact: true }).click();
   await settle(page, 800);
-  const without = await bandPower(page, 0);
-  expect(10 * Math.log10(withSub / without)).toBeGreaterThan(3);
+  const without = await bandPower(page, 3);
+  expect(10 * Math.log10(withSub / without)).toBeGreaterThan(10);
 });
 
 test.describe("Vox Humana fan (D8)", () => {
@@ -127,4 +130,28 @@ test.describe("Vox Humana fan (D8)", () => {
     await settle(page, 5000);
     expect((await measure(page, 800)).treble).toBeLessThan(0.5);   // stopped
   });
+});
+
+test("full wind reads flat on the pitch readout, like a free reed (D12)", async ({ page }) => {
+  await openOrgan(page);            // helper at 100% holds the wind near the top of the gauge
+  await hold(page, "y");
+  await page.waitForTimeout(2500);
+  const text = await page.locator("#rPitch").textContent();
+  expect(text).toMatch(/^−\d+ ¢$/);
+});
+
+// The opening stops on A4 with the default reed set (seed 1): the two 8′ ranks are
+// about 0.8 ¢ apart there, a 2.9 s beat when they're left to beat freely.
+test("Unison pull holds Diapason and Melodia in step; Off lets them beat (D14)", async ({ page }) => {
+  await openOrgan(page);
+  await hold(page, "y");
+  await page.waitForTimeout(1200);
+  const locked = await measure(page, 3000);
+  await letGo(page, "y");
+  await setSlider(page, "pullAmt", 0);
+  await hold(page, "y");
+  await page.waitForTimeout(1200);
+  const free = await measure(page, 3000);
+  expect(locked.overall).toBeLessThan(1);
+  expect(free.overall).toBeGreaterThan(3);
 });

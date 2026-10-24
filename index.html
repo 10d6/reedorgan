@@ -144,12 +144,12 @@
         <div class="field">
           <div class="field-head"><label for="sensAmt">Pitch drift</label><output id="sensOut" for="sensAmt">10 ¢</output></div>
           <input type="range" id="sensAmt" min="0" max="25" step="1" value="10">
-          <p class="sub">How far the pitch moves between empty and full wind. Low is a well-regulated organ, high a worn one.</p>
+          <p class="sub">How far the pitch moves between empty and full wind. Like any free reed, these go flat as you blow harder and sharpen as the wind fades. Low is a well-regulated organ, high a worn one.</p>
         </div>
         <div class="field">
           <div class="field-head"><label for="driftVarAmt">Drift variation</label><output id="driftVarOut" for="driftVarAmt">40%</output></div>
           <input type="range" id="driftVarAmt" min="0" max="100" step="1" value="40">
-          <p class="sub">Reeds are tuned at normal wind, but each one wanders a little differently as the wind rises and falls, low reeds more than high. Octaves and unisons drift apart and back together as you pump.</p>
+          <p class="sub">Reeds are tuned at normal wind, but each one wanders a little differently as the wind rises and falls, low reeds more than high. Reeds on different keys drift apart and back together as you pump; reeds held in step by Unison pull drift together.</p>
         </div>
       </div>
       <div class="rail">
@@ -186,9 +186,9 @@
           <p class="sub">How slowly each note blooms in. Higher is slower.</p>
         </div>
         <div class="field">
-          <div class="field-head"><label for="scoopAmt">Pitch scoop</label><output id="scoopOut" for="scoopAmt">16 ¢</output></div>
-          <input type="range" id="scoopAmt" min="0" max="40" step="1" value="16">
-          <p class="sub">How far flat each note starts before it settles.</p>
+          <div class="field-head"><label for="scoopAmt">Speech glide</label><output id="scoopOut" for="scoopAmt">5 ¢</output></div>
+          <input type="range" id="scoopAmt" min="0" max="40" step="1" value="5">
+          <p class="sub">How far sharp each note starts before it settles. A reed speaks near its natural pitch and sinks a little as its swing grows.</p>
         </div>
         <div class="field">
           <div class="field-head"><label for="beatAmt">Celeste beat</label><output id="beatOut" for="beatAmt">1.5 /s</output></div>
@@ -200,6 +200,11 @@
           <input type="range" id="scatterAmt" min="0" max="5" step="0.1" value="1">
           <p class="sub">Each reed's own small tuning error, different on every key and every rank, so beats between reeds never line up into a pattern.</p>
           <div><button class="btn" id="newReeds" type="button">Fit a new set of reeds</button></div>
+        </div>
+        <div class="field">
+          <div class="field-head"><label for="pullAmt">Unison pull</label><output id="pullOut" for="pullAmt">3.0 ¢</output></div>
+          <input type="range" id="pullAmt" min="0" max="10" step="0.5" value="3">
+          <p class="sub">Reeds on the same key that sound in unison or octaves, and are tuned within this many cents of each other, pull into step and sound as one instead of beating slowly. The Celeste never locks. Off lets every reed beat freely.</p>
         </div>
       </div>
       <div class="rail">
@@ -236,13 +241,14 @@
 
 <section class="notes">
   <h2>Things to listen for</h2>
-  <div><h3>Let the wind run out</h3><p>Set the helper low, hold a chord and stop pumping. The sound gets quieter, then darker, and sags a few cents flat before the reeds stop speaking.</p></div>
-  <div><h3>Pump harder</h3><p>Strong, alternating strokes push the reeds harder. They get brighter and buzzier, and the pitch creeps sharp. Push too hard and the relief valve vents.</p></div>
+  <div><h3>Let the wind run out</h3><p>Set the helper low, hold a chord and stop pumping. The sound gets quieter, then darker, and creeps a few cents sharp before the reeds stop speaking.</p></div>
+  <div><h3>Pump harder</h3><p>Strong, alternating strokes push the reeds harder. They get brighter and buzzier, and the pitch sinks a few cents flat. Push too hard and the relief valve vents.</p></div>
   <div><h3>Slow-motion feet</h3><p>Give a treadle a long attack and release. The organ swells in and fades away on its own, like a very patient player.</p></div>
   <div><h3>The shimmer</h3><p>Draw Celeste with Diapason. The Celeste reeds are tuned a little sharp so the two ranks beat against each other in a slow wave. Celeste beat sets how fast, the same on every note.</p></div>
   <div><h3>Melody and accompaniment</h3><p>Divide the stops, then draw soft Melodia in the bass and Diapason with Celeste in the treble. The tune sings out over a quiet accompaniment.</p></div>
   <div><h3>Swell and fan</h3><p>Vox Humana spins a little fan in front of the reeds. The fundamentals hold steady while the upper harmonics flicker and swirl. Try the Spinning fan shape with some Stereo sweep, and listen to it coast down when you push the stop in. The knee swell opens the lid gradually: louder and brighter, but it drinks wind faster.</p></div>
-  <div><h3>Living tuning</h3><p>Hold a chord with Diapason and Melodia and pump unevenly. Every pair of reeds drifts at its own pace, so no single beat settles in. Fit a new set of reeds to hear a different instrument.</p></div>
+  <div><h3>Living tuning</h3><p>Hold a chord with Diapason and Melodia and pump unevenly. Each key drifts at its own pace, so the intervals between keys never settle into one pattern. Fit a new set of reeds to hear a different instrument.</p></div>
+  <div><h3>Reeds in step</h3><p>Hold one note with Diapason and Melodia. The two ranks pull together and sound as one steady tone. Set Unison pull to Off and the same note swells and fades slowly as the two reeds drift past each other.</p></div>
   <div><h3>Couplers</h3><p>Draw Sub Octave and hold a chord: the keys an octave down sink with yours, and the bass grows heavy. Every coupled note is another set of reeds drinking wind.</p></div>
   <div><h3>Voice your own organ</h3><p>Open Rank voicing under Adjustments. Darken the Diapason, brighten the Principal, or detune a rank a few cents to hear how much a regulator's touch changes the instrument.</p></div>
 </section>

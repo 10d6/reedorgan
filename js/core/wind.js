@@ -19,6 +19,12 @@ export function windLevel(p) {
   const slope = 1.2 * Math.pow(KNEE, .2);
   return base(KNEE) + HEAD * Math.tanh((p - KNEE) * slope / HEAD);
 }
+// The organ's pitch offset in cents at pressure p, for a Pitch drift of `sens`
+// cents across the whole gauge (D12). Free reeds go FLAT as the wind rises: the
+// harder blown reed swings wider and spends longer out of the slot, which lowers
+// its frequency. At low wind they sit sharp, nearer their natural frequency.
+export const windCents = (p, sens) => (P_REF - p) * sens;
+
 // Brightness keeps climbing above the knee, but at half the rate.
 export const windBright = p => p <= KNEE ? p : KNEE + (p - KNEE) * .5;
 

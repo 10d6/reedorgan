@@ -37,12 +37,12 @@ function instrument() {
   window.__midi = (a, b, c) => input.onmidimessage && input.onmidimessage({ data: new Uint8Array([a, b, c]) });
   navigator.requestMIDIAccess = async () => ({ inputs: new Map([["1", input]]), onstatechange: null });
 
-  // 3. Sampling: every 8 ms, power per band (<400 Hz, >2 kHz, all) for each ear.
+  // 3. Sampling: every 8 ms, power per band (<400 Hz, >2 kHz, all, <160 Hz) for each ear.
   const bands = (an) => {
     const f = new Float32Array(an.frequencyBinCount); an.getFloatFrequencyData(f);
-    const bin = an.context.sampleRate / an.fftSize; let lo = 0, hi = 0, all = 0;
-    for (let i = 1; i < f.length; i++) { const p = 10 ** (f[i] / 10), hz = i * bin; all += p; if (hz < 400) lo += p; else if (hz > 2000) hi += p; }
-    return [lo, hi, all];
+    const bin = an.context.sampleRate / an.fftSize; let lo = 0, hi = 0, all = 0, sub = 0;
+    for (let i = 1; i < f.length; i++) { const p = 10 ** (f[i] / 10), hz = i * bin; all += p; if (hz < 400) lo += p; else if (hz > 2000) hi += p; if (hz < 160) sub += p; }
+    return [lo, hi, all, sub];
   };
   window.__sample = (ms) => new Promise((done) => {
     const frames = [], iv = setInterval(() => { const e = window.__ears; if (e) frames.push([bands(e.L), bands(e.R)]); }, 8);

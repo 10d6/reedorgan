@@ -38,16 +38,21 @@ changes the organ's loudness, brightness, pitch and how quickly notes speak.
 - **Treadle envelopes**: each foot has its own attack, decay, sustain and release
   for the airflow, from 5 ms up to 30 s.
 - **Wind behaviour**: loudness rises up to about 2″ on the gauge and then levels
-  off. Low wind sounds darker and flatter; high wind sounds brighter and slightly
-  sharp, and the relief valve vents when the reservoir is full.
+  off. Low wind sounds darker and creeps sharp; high wind sounds brighter and
+  sinks slightly flat, as free reeds do, and the relief valve vents when the
+  reservoir is full.
 - **Adjustments**: reservoir size, pitch drift with pressure, reed speech
-  speed, pitch scoop, Celeste beat rate, Cabinet and Room reverb, breath noise
-  level and treadle noise level.
+  speed, speech glide (notes start a touch sharp and settle), Celeste beat
+  rate, Cabinet and Room reverb, breath noise level and treadle noise level.
 - **Individual reeds**: every reed (each rank on each key) has its own small,
   random tuning error (*Reed scatter*) and its own response to the wind (*Drift
-  variation*, larger for low reeds). Beats between reeds differ from key to key
-  and shift as the wind moves, so no pattern settles in. *Fit a new set of
-  reeds* draws a fresh set.
+  variation*, larger for low reeds). Beats between keys differ and shift as the
+  wind moves, so no pattern settles in. *Fit a new set of reeds* draws a fresh
+  set.
+- **Unison pull**: reeds on the same key that sound in unison or octaves, and
+  are tuned within a few cents of each other, pull into step and sound as one
+  instead of beating slowly, as reeds sharing one wind chest tend to. The
+  Celeste never locks. Each reed also starts at its own point in its swing.
 - **Wind tone**: how the wind colours the sound. *Natural tilt* (the default)
   shifts the balance of upper harmonics against the fundamental, as a real reed
   does; *Filter sweep* is the original moving lowpass. Depth, resonance (Q) and

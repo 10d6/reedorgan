@@ -1,7 +1,7 @@
 // Every slider and setting the player can change, and where it is saved.
 // setupControls() binds them to the page; the sound reads them through `ctl`.
 
-import { RANKS, CELESTE } from './core/ranks.js';
+import { RANKS } from './core/ranks.js';
 import { HELPER_MAX } from './core/wind.js';
 import { S, store } from './state.js';
 import { initAudio, applyStops, applyVox, applyMix, setFanShape, retune, rewind, revoice, updateComp, ctx } from './audio.js';
@@ -60,13 +60,14 @@ export function setupControls() {
 
   /* ---- reeds ---- */
   ctl.speech = bindSlider('speechAmt', 'speech', 33, fmtX, null, logMap(.5, 4));
-  ctl.scoop = bindSlider('scoopAmt', 'scoop', 16, v => v === 0 ? 'None' : v + ' ¢');
-  ctl.scatter = bindSlider('scatterAmt', 'reedScatter', 1, v => v === 0 ? 'Perfect' : '±' + v.toFixed(1) + ' ¢', () => RANKS.forEach((_, i) => retune(i)));
+  ctl.scoop = bindSlider('scoopAmt', 'scoop', 5, v => v === 0 ? 'None' : v + ' ¢');
+  ctl.scatter = bindSlider('scatterAmt', 'reedScatter', 1, v => v === 0 ? 'Perfect' : '±' + v.toFixed(1) + ' ¢', () => retune());
   $('newReeds').addEventListener('click', () => {
     S.reedSeed = (S.reedSeed % 100000) + 1 + Math.floor(Math.random() * 997); store.set('reedSeed', S.reedSeed);
-    RANKS.forEach((_, i) => retune(i)); rewind();
+    retune();
   });
-  ctl.beat = bindSlider('beatAmt', 'celesteBeat', 1.5, v => v.toFixed(1) + ' /s', () => retune(CELESTE));
+  ctl.pull = bindSlider('pullAmt', 'unisonPull', 3, v => v === 0 ? 'Off' : v.toFixed(1) + ' ¢', () => retune());
+  ctl.beat = bindSlider('beatAmt', 'celesteBeat', 1.5, v => v.toFixed(1) + ' /s', () => retune());
   ctl.breath = bindSlider('breathAmt', 'breath', 100, v => v === 0 ? 'Off' : v + '%', null, v => v / 100);
 
   /* ---- rank voicing drawer: level, fine tuning and brightness per rank ---- */
@@ -88,7 +89,7 @@ export function setupControls() {
     const c = cap(r.id);
     return {
       level: bindSlider(`lv${c}Amt`, 'v-level-' + r.id, 100, v => v === 0 ? 'Silent' : v + '%', () => applyStops(), v => v / 100),
-      tune: bindSlider(`tu${c}Amt`, 'v-tune-' + r.id, 0, v => v === 0 ? '0 ¢' : signed(v, 1) + ' ¢', () => retune(i)),
+      tune: bindSlider(`tu${c}Amt`, 'v-tune-' + r.id, 0, v => v === 0 ? '0 ¢' : signed(v, 1) + ' ¢', () => retune()),
       bright: bindSlider(`br${c}Amt`, 'v-bright-' + r.id, 0, v => v === 0 ? 'Factory' : signed(v), () => revoice(i)),
     };
   });

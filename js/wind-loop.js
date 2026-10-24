@@ -3,7 +3,7 @@
 // the gauge, pedals and readouts.
 
 import { RANKS, HALVES } from './core/ranks.js';
-import { GMAX, PEAK_FLOW, P_REF, gaugeInches, stepEnvelope } from './core/wind.js';
+import { GMAX, PEAK_FLOW, gaugeInches, windCents, stepEnvelope } from './core/wind.js';
 import { S, stops, voices, reduceMotion } from './state.js';
 import { applyWind } from './audio.js';
 import { ctl } from './controls.js';
@@ -64,7 +64,7 @@ function frame(now) {
   if (uiT > .1) {
     uiT = 0;
     rWind.textContent = gaugeInches(S.pressure).toFixed(1) + '″';
-    const c = Math.round((S.pressure - P_REF) * ctl.sens.value); rPitch.textContent = (c > 0 ? '+' : c < 0 ? '−' : '') + Math.abs(c) + ' ¢';
+    const c = Math.round(windCents(S.pressure, ctl.sens.value)); rPitch.textContent = (c > 0 ? '+' : c < 0 ? '−' : '') + Math.abs(c) + ' ¢';
     rReeds.textContent = reeds;
     rUse.textContent = drain.toFixed(2) + '/s';
     for (const P of [ped.L, ped.R]) {
