@@ -3,8 +3,9 @@
 
 import { RANKS } from './core/ranks.js';
 import { HELPER_MAX } from './core/wind.js';
+import { volumeGain, bassCutHz } from './core/output.js';
 import { S, store } from './state.js';
-import { initAudio, applyStops, applyVox, applyMix, setFanShape, retune, rewind, revoice, updateComp, ctx } from './audio.js';
+import { initAudio, applyStops, applyVox, applyMix, applyOutput, setFanShape, retune, rewind, revoice, updateComp, ctx } from './audio.js';
 
 // Filled in by setupControls(). Each slider is {el, value, set(v)}; `value` is
 // already mapped to what the sound uses (see bindSlider).
@@ -43,6 +44,8 @@ export function setupControls() {
   const $ = id => document.getElementById(id);
 
   /* ---- swell and wind ---- */
+  // Volume: 100% is the level before D20; the slider is squared so it feels even.
+  ctl.volume = bindSlider('volumeAmt', 'volume', 100, v => v === 0 ? 'Silent' : v + '%', () => applyOutput(), volumeGain);
   ctl.swell = bindSlider('swellAmt', 'swell', 0, v => v === 0 ? 'Closed' : v === 100 ? 'Full' : v + '%', null, v => v / 100);
   ctl.res = bindSlider('resAmt', 'reservoir', 45, fmtX, null, logMap(.4, 3));
   ctl.sens = bindSlider('sensAmt', 'sensitivity', 10, v => v + ' ¢');
@@ -57,6 +60,9 @@ export function setupControls() {
   ctl.toneDepth = bindSlider('toneDepthAmt', 'toneDepth', 60, v => v === 0 ? 'None' : v + '%', null, v => v / 100);
   ctl.toneQ = bindSlider('toneQAmt', 'toneQ', 12, (_, q) => 'Q ' + q.toFixed(2), null, logMap(.5, 8));
   ctl.toneResp = bindSlider('toneRespAmt', 'toneResponse', 55, (_, t) => t < .1 ? Math.round(t * 1000) + ' ms' : t < 1 ? Math.round(t * 100) * 10 + ' ms' : t.toFixed(1) + ' s', null, logMap(.02, 2));
+
+  // Cabinet bass (D19): the corner of the cabinet's bass roll-off; the bottom of the slider is Off.
+  ctl.bassCut = bindSlider('bassCutAmt', 'bassCut', 60, (v, f) => v === 0 ? 'Off' : 'below ' + Math.round(f) + ' Hz', () => applyOutput(), bassCutHz);
 
   /* ---- reeds ---- */
   ctl.speech = bindSlider('speechAmt', 'speech', 33, fmtX, null, logMap(.5, 4));

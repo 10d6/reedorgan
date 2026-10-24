@@ -14,6 +14,8 @@ changes the organ's loudness, brightness, pitch and how quickly notes speak.
 | Pump | Hold the Left and Right treadles, or hold `←` `→` (alternating fills fastest). `Space` pumps the next foot |
 | Steady wind | Raise **Helper pump** under Adjustments. If you play more than it supplies, the wind slowly runs out |
 | Swell | Move the **Knee swell** slider, or use a MIDI expression pedal (CC11 or CC4) |
+| Volume | The **Volume** slider. Above 100% a limiter keeps loud chords clean |
+| Stuck note | **All notes off**, or `Esc` |
 | MIDI keyboard | Click **Connect MIDI keyboard**. Works in Chrome, Edge, Opera and Firefox. Responds to notes, the sustain pedal (CC64), expression (CC11/CC4) and all-notes-off |
 
 ## What's in it
@@ -39,8 +41,12 @@ changes the organ's loudness, brightness, pitch and how quickly notes speak.
   fan* shape; the fan spins up when the stop is drawn and coasts down when it's
   retired. The earlier whole-sound tremolo is still there as *Whole-sound
   wobble* and *Lid wobble*, off by default.
-- A continuous **knee swell** that opens the lid gradually for a louder,
-  brighter sound that uses more wind.
+- A continuous **knee swell** that opens the lid gradually for a louder
+  (about 6 dB), brighter sound that uses more wind.
+- **Cabinet bass**: the case can't radiate the deepest notes, so the bass is
+  reedy rather than booming. Turn it down or Off for a deeper bass.
+- **Keyboard compass**: Full range (every MIDI note, A0 to C8) or a real reed
+  organ's 61 keys, F to F, where couplers fall silent past the ends.
 - **Treadle envelopes**: each foot has its own attack, decay, sustain and release
   for the airflow, from 5 ms up to 30 s.
 - **Wind behaviour**: loudness rises up to about 2″ on the gauge and then levels

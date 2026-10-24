@@ -50,14 +50,14 @@ test("Brightness changes the tone but not the volume (D4)", async ({ page }) => 
   expect(Math.abs(db(dark.level / base.level))).toBeLessThan(3.5);
 });
 
-test("the knee swell opens louder and brighter", async ({ page }) => {
+test("the knee swell opens louder and brighter, about 5 dB (D21)", async ({ page }) => {
   await openOrgan(page);
   await diapasonA3(page);
   const closed = { level: await avg(page, rms), treble: await bandPower(page, 1) };
   await setSlider(page, "swellAmt", 100); await settle(page, 1200);
   const open = { level: await avg(page, rms), treble: await bandPower(page, 1) };
-  expect(db(open.level / closed.level)).toBeGreaterThan(1);
-  expect(10 * Math.log10(open.treble / closed.treble)).toBeGreaterThan(4);   // treble rises more than the whole
+  expect(db(open.level / closed.level)).toBeGreaterThan(3.5);
+  expect(10 * Math.log10(open.treble / closed.treble)).toBeGreaterThan(db(open.level / closed.level));   // treble rises more than the whole
 });
 
 test("Sub octave coupler adds bass", async ({ page }) => {
@@ -193,4 +193,39 @@ test("notes start dark and brighten as the reed speaks; Tone bloom Off doesn't (
   const flat = await onset(page, "z", 700);
   expect(mean(early(bloom))).toBeLessThan(steady(bloom) * 0.85);
   expect(mean(early(flat))).toBeGreaterThan(steady(flat) * 0.9);
+});
+
+test("Volume 50% is 12 dB down and 0% is silent (D20)", async ({ page }) => {
+  await openOrgan(page);
+  await diapasonA3(page);
+  const full = await avg(page, rms);
+  await setSlider(page, "volumeAmt", 50); await settle(page);
+  expect(db((await avg(page, rms)) / full)).toBeCloseTo(-12, 0);
+  await setSlider(page, "volumeAmt", 0); await settle(page);
+  expect(await avg(page, rms)).toBeLessThan(full * 0.01);
+});
+
+test("the limiter keeps a loud full organ at Volume 150% from clipping (D20)", async ({ page }) => {
+  await openOrgan(page);
+  await setSlider(page, "resAmt", 100);                  // a big reservoir so the wind keeps up
+  for (const s of ["Bourdon 16′", "Celeste 8′", "Principal 4′", "Sub octave coupler", "Super octave coupler"]) await toggleStop(page, s);
+  await setSlider(page, "volumeAmt", 150); await setSlider(page, "swellAmt", 100);
+  await hold(page, "q"); await page.waitForTimeout(3000);
+  const peak = await page.evaluate(() => new Promise((done) => {
+    const a = window.__ears.L, b = new Float32Array(a.fftSize); let p = 0;
+    const iv = setInterval(() => { a.getFloatTimeDomainData(b); for (const x of b) p = Math.max(p, Math.abs(x)); }, 10);
+    setTimeout(() => { clearInterval(iv); done(p); }, 1500);
+  }));
+  expect(peak).toBeGreaterThan(0.5);                    // it is loud
+  expect(peak).toBeLessThan(1);                         // but never reaches full scale
+});
+
+test("Cabinet bass rolls off the Bourdon's deepest fundamentals; Off keeps them (D19)", async ({ page }) => {
+  await openOrgan(page);
+  await toggleStop(page, "Diapason 8′"); await toggleStop(page, "Melodia 8′"); await toggleStop(page, "Bourdon 16′");
+  await hold(page, "z"); await page.waitForTimeout(1500);   // C3: the Bourdon sounds C2, 65 Hz
+  const cut = await bandPower(page, 3);
+  await setSlider(page, "bassCutAmt", 0); await settle(page);
+  const off = await bandPower(page, 3);
+  expect(10 * Math.log10(off / cut)).toBeGreaterThan(3);
 });

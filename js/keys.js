@@ -1,8 +1,8 @@
 // The keyboard on screen, octave couplers, and every way of playing it:
 // pointer, computer keys and MIDI.
 
-import { S, stops, voices, splitNote } from './state.js';
-import { initAudio, noteOn, noteOff, ctx } from './audio.js';
+import { S, stops, voices, splitNote, store } from './state.js';
+import { initAudio, noteOn, noteOff, silenceAll, ctx } from './audio.js';
 import { ctl } from './controls.js';
 import { ped, gateOn, gateOff } from './treadles.js';
 
@@ -11,6 +11,13 @@ const KEYMAP = {
   q: 60, '2': 61, w: 62, '3': 63, e: 64, r: 65, '5': 66, t: 67, '6': 68, y: 69, '7': 70, u: 71,
   i: 72, '9': 73, o: 74, '0': 75, p: 76, '[': 77, '=': 78, ']': 79,
 };
+// The same keys by physical position (KeyboardEvent.code). Notes are tracked by
+// position, so Shift or a symbol on the key can't change which note a key-up
+// releases (a shifted "2" comes up as "@", which used to leave the note stuck).
+const CODE_NAME = { '[': 'BracketLeft', '=': 'Equal', ']': 'BracketRight' };
+const CODEMAP = {}; for (const k in KEYMAP) CODEMAP[CODE_NAME[k] || (/\d/.test(k) ? 'Digit' + k : 'Key' + k.toUpperCase())] = KEYMAP[k];
+const keyId = e => (e.code && e.code in CODEMAP) ? e.code : (e.key || '').toLowerCase();
+const noteOfKey = id => id in CODEMAP ? CODEMAP[id] : KEYMAP[id];
 const LABEL = {}; for (const k in KEYMAP) LABEL[KEYMAP[k]] = k;
 const isBlack = m => [1, 3, 6, 8, 10].includes(m % 12);
 let keysEl, range = null;
@@ -43,11 +50,18 @@ function buildKeys() {
 export function rebuildKeys() { range = null; buildKeys(); }
 export function markKey(m, on) { const el = keysEl.querySelector(`[data-midi="${m}"]`); if (el) el.classList.toggle('down', on); }
 
+/* ---------- compass (D19) ---------- */
+// Which notes the organ has. A real 61-key reed organ runs F to F; Full range
+// plays anything a MIDI keyboard or a coupler reaches, A0 to C8.
+export const COMPASS = { full: [21, 108], organ: [29, 89] };
+const inCompass = n => { const c = COMPASS[S.compass] || COMPASS.full; return n >= c[0] && n <= c[1]; };
+
 /* ---------- octave couplers (D5) ---------- */
 // Like the real mechanism, a coupler pulls down the key an octave below or above,
 // so the coupled note sounds with whichever stops are drawn in its own half.
+// A coupler past the end of the compass has no key to pull, so it stays silent.
 const coupled = new Map();   // played key -> list of sets of notes it is holding down
-const couplesFor = m => [m, ...(stops.sub ? [m - 12] : []), ...(stops.sup ? [m + 12] : [])];
+const couplesFor = m => [m, ...(stops.sub ? [m - 12] : []), ...(stops.sup ? [m + 12] : [])].filter(inCompass);
 export function press(m) {
   const set = couplesFor(m); set.forEach(noteOn);
   if (!coupled.has(m)) coupled.set(m, []); coupled.get(m).push(set);
@@ -69,6 +83,16 @@ export function recouple() {
 /* ---------- MIDI ---------- */
 let midiAccess = null, sustain = false, midiBtn, midiStatus;
 const midiHeld = new Set(), sustained = new Set();
+const kbHeld = new Set(), ptrs = new Map();   // computer keys and pointers holding notes
+
+/* ---------- all notes off (D18) ---------- */
+// Forgets every way a note is being held (computer keys, pointers, MIDI keys
+// and the sustain pedal's notes, couplers) and silences every voice. For the
+// button, Escape, and MIDI all-notes-off.
+export function allNotesOff() {
+  kbHeld.clear(); ptrs.clear(); midiHeld.clear(); sustained.clear(); coupled.clear();
+  silenceAll();
+}
 function setMidi(msg, cls) { midiStatus.textContent = msg; midiStatus.className = 'midi-status' + (cls ? ' ' + cls : ''); }
 async function connectMidi() {
   initAudio();
@@ -108,7 +132,7 @@ function onMidi(ev) {
     } else if (d1 === 11 || d1 === 4) {
       ctl.swell.set(Math.round(d2 / 127 * 100));
     } else if (d1 === 123 || d1 === 120) {
-      midiHeld.forEach(release); sustained.forEach(release); midiHeld.clear(); sustained.clear();
+      allNotesOff();
     }
   }
 }
@@ -119,9 +143,9 @@ export function setupKeys() {
   new ResizeObserver(buildKeys).observe(keysEl);
 
   /* pointer: press, and slide across keys */
-  const ptrs = new Map();
   keysEl.addEventListener('pointerdown', e => {
     const k = e.target.closest('.key'); if (!k) return;
+    if (e.pointerType === 'mouse' && e.button !== 0) return;   // a right-click's menu can swallow the release
     e.preventDefault(); keysEl.setPointerCapture(e.pointerId);
     const m = +k.dataset.midi; ptrs.set(e.pointerId, m); press(m);
   });
@@ -134,10 +158,14 @@ export function setupKeys() {
   });
   const endPtr = e => { if (!ptrs.has(e.pointerId)) return; const m = ptrs.get(e.pointerId); if (m != null) release(m); ptrs.delete(e.pointerId); };
   keysEl.addEventListener('pointerup', endPtr); keysEl.addEventListener('pointercancel', endPtr);
+  keysEl.addEventListener('lostpointercapture', endPtr);
+  keysEl.addEventListener('contextmenu', e => e.preventDefault());
 
   /* computer keys: letter rows play, arrows and Space pump */
-  const kbHeld = new Set(); let spaceSide = null;
+  let spaceSide = null;
+  const releaseKeys = () => { kbHeld.forEach(id => release(noteOfKey(id))); kbHeld.clear(); };
   window.addEventListener('keydown', e => {
+    if (e.key === 'Escape') { allNotesOff(); return; }
     if (e.metaKey || e.ctrlKey || e.altKey) return;
     const tag = e.target.tagName;
     if (tag === 'INPUT' && (e.key.startsWith('Arrow') || e.key === ' ')) return; // let sliders use arrows
@@ -147,19 +175,27 @@ export function setupKeys() {
       e.preventDefault(); if (e.repeat || spaceSide) return;
       spaceSide = S.lastSide === 'L' ? 'R' : 'L'; gateOn(ped[spaceSide]); return;
     }
-    const k = e.key.toLowerCase();
-    if (k in KEYMAP) { e.preventDefault(); if (e.repeat || kbHeld.has(k)) return; kbHeld.add(k); press(KEYMAP[k]); }
+    const id = keyId(e), m = noteOfKey(id);
+    if (m !== undefined) { e.preventDefault(); if (e.repeat || kbHeld.has(id)) return; kbHeld.add(id); press(m); }
   });
   window.addEventListener('keyup', e => {
     if (e.key === 'ArrowLeft') gateOff(ped.L);
     else if (e.key === 'ArrowRight') gateOff(ped.R);
     else if (e.key === ' ' && spaceSide) { gateOff(ped[spaceSide]); spaceSide = null; }
-    const k = e.key.toLowerCase(); if (kbHeld.has(k)) { kbHeld.delete(k); release(KEYMAP[k]); }
+    // A Mac sends no key-up for keys let go while Command is held, so letting go
+    // of Command releases every computer key.
+    if (e.key === 'Meta') { releaseKeys(); return; }
+    const id = keyId(e); if (kbHeld.has(id)) { kbHeld.delete(id); release(noteOfKey(id)); }
   });
-  window.addEventListener('blur', () => {
-    kbHeld.forEach(k => release(KEYMAP[k])); kbHeld.clear();
-    gateOff(ped.L); gateOff(ped.R); spaceSide = null;
-  });
+  const letGoAll = () => { releaseKeys(); gateOff(ped.L); gateOff(ped.R); spaceSide = null; };
+  window.addEventListener('blur', letGoAll);
+  document.addEventListener('visibilitychange', () => { if (document.hidden) letGoAll(); });
+
+  /* the All notes off button and the keyboard compass */
+  document.getElementById('panicBtn').addEventListener('click', () => { allNotesOff(); keysEl.focus?.(); });
+  const compassEl = document.getElementById('compass');
+  compassEl.value = S.compass;
+  compassEl.addEventListener('change', () => { S.compass = compassEl.value; store.set('compass', S.compass); recouple(); });
 
   /* MIDI */
   midiBtn = document.getElementById('midiBtn'); midiStatus = document.getElementById('midiStatus');

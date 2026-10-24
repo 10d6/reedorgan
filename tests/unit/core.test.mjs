@@ -7,6 +7,7 @@ import { windSpeech, speechTime, onsetTau, onsetShape, RISE_PER_TAU, TILT_RATIO 
 import { reedRand, reedTri, reedError, reedWindResponse, lockReeds } from "../../js/core/reeds.js";
 import { windLevel, windBright, windCents, KNEE, P_REF, gaugeInches, toTime, toSlider, fmtT, stepEnvelope, DEFAULT_ENV } from "../../js/core/wind.js";
 import { fanWaveCoefficients } from "../../js/core/fan.js";
+import { volumeGain, bassCutHz, limiterMakeupDb, softClip, softClipCurve } from "../../js/core/output.js";
 
 const near = (a, b, tol, msg) => assert.ok(Math.abs(a - b) <= tol, `${msg ?? ""} expected ${b} ± ${tol}, got ${a}`);
 const corr = (a, b) => {
@@ -179,4 +180,17 @@ test("D16: speech time is S-shaped, slower for low reeds and low wind", () => {
 
 test("D17: each reed's tone shelf sits between its fundamental and 2nd harmonic", () => {
   assert.ok(TILT_RATIO > 1 && TILT_RATIO < 2);
+});
+
+test("D20: Volume, limiter make-up and the soft-clip ceiling", () => {
+  near(volumeGain(100), 1, 1e-12); near(20 * Math.log10(volumeGain(50)), -12.04, 0.01); assert.equal(volumeGain(0), 0);
+  near(limiterMakeupDb(-4, 20), 2.28, 1e-9, "Chromium's make-up: 0.6 × 3.8 dB");
+  for (const x of [0, 0.3, -0.5, 0.899]) assert.equal(softClip(x), x, "unity below 0.9");
+  let prev = -Infinity;
+  for (let x = -1.5; x <= 1.5; x += 0.001) { const y = softClip(x); assert.ok(Math.abs(y) < 0.986, `below full scale at ${x}`); assert.ok(y >= prev, "monotonic"); prev = y; }
+  const c = softClipCurve(); assert.equal(c.length, 2049); near(c[1024], 0, 1e-12); near(c[0], softClip(-1), 1e-7);
+});
+
+test("D19: Cabinet bass slider maps to a 20–200 Hz corner, bottom is Off", () => {
+  near(bassCutHz(60), 79.6, 0.1); near(bassCutHz(100), 200, 1e-9); assert.ok(bassCutHz(0) < 10);
 });

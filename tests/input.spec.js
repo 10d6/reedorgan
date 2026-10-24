@@ -1,6 +1,6 @@
 // Playing with the mouse, the computer keyboard, the treadles and a MIDI keyboard.
 import { test, expect } from "@playwright/test";
-import { openOrgan, hold, letGo, keysDown, readout, focusKeys, setSlider } from "./organ.js";
+import { openOrgan, hold, letGo, keysDown, readout, focusKeys, setSlider, rms } from "./organ.js";
 
 test("clicking and dragging across keys plays them in turn", async ({ page }) => {
   await openOrgan(page);
@@ -72,4 +72,57 @@ test("Space pumps the next foot and the treadle envelope shows its stage", async
   await page.keyboard.down(" ");
   await expect(page.locator("#flowL")).toContainText(/attack|decay|sustain/);
   await page.keyboard.up(" ");
+});
+
+test("All notes off, and Escape, silence everything and clear held keys (D18)", async ({ page }) => {
+  await openOrgan(page);
+  await page.click("#midiBtn");
+  const midi = (a, b, c) => page.evaluate(([a, b, c]) => window.__midi(a, b, c), [a, b, c]);
+  await hold(page, "q", "e");
+  await midi(0xb0, 64, 127); await midi(0x90, 67, 90); await midi(0x80, 67, 0);   // a note held by the sustain pedal
+  await page.waitForTimeout(600);
+  expect(await keysDown(page)).toEqual([60, 64, 67]);
+  await page.click("#panicBtn");
+  await page.waitForTimeout(800);
+  expect(await keysDown(page)).toEqual([]);
+  expect(await rms(page)).toBeLessThan(1e-3);
+  await letGo(page, "q", "e"); await midi(0xb0, 64, 0);   // late releases are harmless
+  await hold(page, "q"); await page.waitForTimeout(400);
+  expect(await keysDown(page)).toEqual([60]);            // and playing works again
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(800);
+  expect(await keysDown(page)).toEqual([]);
+  expect(await rms(page)).toBeLessThan(1e-3);
+  await letGo(page, "q");
+});
+
+test("Shift and Command can't leave computer keys stuck (D18)", async ({ page }) => {
+  await openOrgan(page);
+  await hold(page, "2");                                 // C#4
+  await page.keyboard.down("Shift");
+  await page.keyboard.up("2");                          // comes up as "@"
+  await page.keyboard.up("Shift");
+  await page.waitForTimeout(300);
+  expect(await keysDown(page)).toEqual([]);
+  await hold(page, "q");
+  await page.keyboard.down("Meta"); await page.keyboard.up("Meta");   // a Mac drops the key-up after Command
+  await page.waitForTimeout(300);
+  expect(await keysDown(page)).toEqual([]);
+  await letGo(page, "q");
+});
+
+test("Keyboard compass: Full range plays deep MIDI notes, Reed organ doesn't (D19)", async ({ page }) => {
+  await openOrgan(page);
+  await page.click("#midiBtn");
+  const midi = (a, b, c) => page.evaluate(([a, b, c]) => window.__midi(a, b, c), [a, b, c]);
+  await midi(0x90, 24, 100); await page.waitForTimeout(800);   // C1
+  expect(await page.locator("#rReeds").textContent()).toBe("2");
+  await midi(0x80, 24, 0); await page.waitForTimeout(300);
+  await page.selectOption("#compass", "organ");
+  await midi(0x90, 24, 100); await page.waitForTimeout(500);
+  expect(await page.locator("#rReeds").textContent()).toBe("0");
+  await midi(0x80, 24, 0);
+  await midi(0x90, 29, 100); await page.waitForTimeout(500);   // F1, the bottom key
+  expect(await page.locator("#rReeds").textContent()).toBe("2");
+  await midi(0x80, 29, 0);
 });
