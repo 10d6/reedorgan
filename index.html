@@ -128,6 +128,28 @@
       <label class="check" for="link"><input type="checkbox" id="link" checked> Same envelope for both feet</label>
     </div>
     <p class="sub" style="margin:0 0 14px">Each treadle feeds air through its own envelope. Pressing starts the attack; holding keeps the sustain flowing; letting go starts the release. Times run up to 30 seconds.</p>
+    <div class="rail autoplay" id="autoplay">
+      <div class="auto-head">
+        <p class="rail-label">Pedal autoplay</p>
+        <label class="check" for="autoOn"><input type="checkbox" id="autoOn" checked> Pump for me</label>
+      </div>
+      <div class="auto-ctrls">
+        <div class="field">
+          <div class="field-head"><label for="tempoAmt">Tempo</label><output id="tempoOut" for="tempoAmt">100 bpm</output></div>
+          <input type="range" id="tempoAmt" min="30" max="200" step="1" value="100">
+        </div>
+        <div class="field">
+          <label for="meter" class="field-label">Time</label>
+          <select id="meter"></select>
+        </div>
+        <div class="field">
+          <label for="measures" class="field-label">Measures</label>
+          <select id="measures"></select>
+        </div>
+      </div>
+      <div class="auto-grid" id="autoGrid"></div>
+      <p class="sub">Tap a beat to change it: Rest, Left, Right, or Tie, which holds the stroke before it longer. The pattern loops, starting when you first play. Tempo counts quarter notes, or eighth notes in 6/8. Your own feet still work, and the helper pump adds a trickle on top.</p>
+    </div>
     <div class="feet" id="feet"></div>
   </section>
 
@@ -138,8 +160,8 @@
       <div class="rail">
         <p class="rail-label">Wind</p>
         <div class="field">
-          <div class="field-head"><label for="helper">Helper pump</label><output id="helperOut" for="helper">Off</output></div>
-          <input type="range" id="helper" min="0" max="100" step="1" value="0">
+          <div class="field-head"><label for="helper">Helper pump</label><output id="helperOut" for="helper">2% · 0.01/s</output></div>
+          <input type="range" id="helper" min="0" max="100" step="1" value="2">
           <p class="sub">An invisible assistant pumps at a steady rate. Below what you're playing, the wind slowly runs out.</p>
         </div>
         <div class="field">
@@ -265,7 +287,8 @@
 
 <section class="notes">
   <h2>Things to listen for</h2>
-  <div><h3>Let the wind run out</h3><p>Set the helper low, hold a chord and stop pumping. The sound gets quieter, then darker, and creeps a few cents sharp before the reeds stop speaking.</p></div>
+  <div><h3>Let the organ pump itself</h3><p>Pedal autoplay works the treadles while you play. Hold a big chord and watch the gauge sink between strokes; set the pattern to Right, Left, Right, Left or raise the tempo and the wind holds. Ties make longer, slower strokes.</p></div>
+  <div><h3>Let the wind run out</h3><p>Turn off Pedal autoplay, set the helper low, hold a chord and stop pumping. The sound gets quieter, then darker, and creeps a few cents sharp before the reeds stop speaking.</p></div>
   <div><h3>Pump harder</h3><p>Strong, alternating strokes push the reeds harder. They get brighter and buzzier, and the pitch sinks a few cents flat. Push too hard and the relief valve vents.</p></div>
   <div><h3>Slow-motion feet</h3><p>Give a treadle a long attack and release. The organ swells in and fades away on its own, like a very patient player.</p></div>
   <div><h3>The shimmer</h3><p>Draw Celeste with Diapason. The Celeste reeds are tuned a little sharp so the two ranks beat against each other in a slow wave. Celeste beat sets how fast, the same on every note.</p></div>

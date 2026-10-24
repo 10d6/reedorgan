@@ -8,6 +8,7 @@ import { S, stops, voices, reduceMotion } from './state.js';
 import { applyWind } from './audio.js';
 import { ctl } from './controls.js';
 import { ped, placeDot } from './treadles.js';
+import { stepAutoplay, autoplayOn } from './autoplay.js';
 
 let needle, rWind, rPitch, rReeds, rUse, statusEl;
 let last = performance.now(), uiT = 0;
@@ -37,6 +38,7 @@ function frame(now) {
   const load = reeds * (1 + .3 * S.swellPos);
   const drain = .018 + .021 * load;
 
+  stepAutoplay();                     // pedal autoplay presses and lifts the treadles (D22)
   let inflow = 0;
   for (const P of [ped.L, ped.R]) {
     stepEnvelope(P, dt);
@@ -75,8 +77,8 @@ function frame(now) {
     else if (S.reliefT > 0) msg = 'Relief valve venting';
     else if (S.pressure < .05 && sounding) msg = 'Out of wind. Pump!';
     else if (S.pressure < .2) msg = 'Wind is low';
-    else if (help > 0 && help < drain && sounding && inflow < drain) msg = 'Helper can’t keep up; wind falling';
-    else { msg = help > 0 ? 'Helper pumping' : 'Keep pumping to hold the wind'; ok = true; }
+    else if (!autoplayOn() && help > 0 && help < drain && sounding && inflow < drain) msg = 'Helper can’t keep up; wind falling';   // autoplay's gaps between strokes would make this flicker
+    else { msg = autoplayOn() ? 'Autoplay pumping' : help > 0 ? 'Helper pumping' : 'Keep pumping to hold the wind'; ok = true; }
     statusEl.textContent = msg; statusEl.classList.toggle('ok', ok);
   }
   requestAnimationFrame(frame);
