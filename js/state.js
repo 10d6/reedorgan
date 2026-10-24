@@ -21,6 +21,7 @@ export const S = {
   compass: saved('compass', 'full', v => v === 'full' || v === 'organ'),
   easyWind: saved('easyWind', false, v => typeof v === 'boolean'),
   directWind: saved('directWind', false, v => typeof v === 'boolean'),
+  directCC: saved('directCC', 7, v => Number.isInteger(v) && v >= 0 && v < 120),   // MIDI control for Direct wind (D27)
   toneModel: saved('toneModel', 'tilt', v => v === 'tilt' || v === 'sweep'),
   voxShape: saved('voxShape', 'sine', v => v === 'sine' || v === 'fan'),
   reedSeed: store.get('reedSeed', 1),

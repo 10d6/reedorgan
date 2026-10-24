@@ -81,9 +81,19 @@ export function recouple() {
 }
 
 /* ---------- MIDI ---------- */
-let midiAccess = null, sustain = false, midiBtn, midiStatus;
+let midiAccess = null, sustain = false, midiBtn, midiStatus, learnBtn, ccOut, learning = false;
 const midiHeld = new Set(), sustained = new Set();
 const kbHeld = new Set(), ptrs = new Map();   // computer keys and pointers holding notes
+
+// Binds Direct wind to MIDI control `cc` and ends learning.
+function setDirectCC(cc) {
+  S.directCC = cc; store.set('directCC', cc); learning = false; showCC();
+}
+function showCC() {
+  ccOut.textContent = learning ? 'Move a knob or slider…' : 'MIDI CC' + S.directCC + (S.directCC === 7 ? ' (volume knob)' : '');
+  learnBtn.textContent = learning ? 'Cancel' : 'Learn';
+  learnBtn.classList.toggle('attention', learning);
+}
 
 /* ---------- all notes off (D18) ---------- */
 // Forgets every way a note is being held (computer keys, pointers, MIDI keys
@@ -127,6 +137,11 @@ function onMidi(ev) {
     midiHeld.delete(d1);
     if (sustain) sustained.add(d1); else release(d1);
   } else if (cmd === 0xB0) {
+    // Direct wind's MIDI control (D27): Learn binds the next control moved;
+    // while Direct wind is on, that control (CC7, the volume knob, unless
+    // learned otherwise) sets the wind before any other use of it.
+    if (learning && d1 < 120) { setDirectCC(d1); return; }
+    if (S.directWind && d1 === S.directCC) { ctl.directAir.set(Math.round(d2 / 127 * 36)); return; }
     if (d1 === 64) {
       sustain = d2 >= 64;
       if (!sustain) { sustained.forEach(release); sustained.clear(); }
@@ -134,6 +149,8 @@ function onMidi(ev) {
       ctl.swell.set(Math.round(d2 / 127 * 100));
     } else if (d1 === 2) {
       ctl.directAir.set(Math.round(d2 / 127 * 36));   // a breath controller sets Direct wind (D26)
+    } else if (d1 === 7) {
+      ctl.volume.set(Math.round(d2 / 127 * 100));     // with Direct wind off, the volume knob is Volume (100% at the top)
     } else if (d1 === 123 || d1 === 120) {
       allNotesOff();
     }
@@ -203,5 +220,11 @@ export function setupKeys() {
   /* MIDI */
   midiBtn = document.getElementById('midiBtn'); midiStatus = document.getElementById('midiStatus');
   midiBtn.classList.add('attention');
+  learnBtn = document.getElementById('directLearn'); ccOut = document.getElementById('directCC');
+  learnBtn.addEventListener('click', () => {
+    learning = !learning; showCC();
+    if (learning && !midiAccess) connectMidi();   // learning needs MIDI, so connect if we haven't
+  });
+  showCC();
   midiBtn.addEventListener('click', connectMidi);
 }

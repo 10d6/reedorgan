@@ -58,6 +58,8 @@ button{font:inherit;color:inherit}
 .top-ctrls{display:flex;flex-direction:column;gap:10px;min-width:0}
 .direct .check{color:var(--text);font-family:var(--f-label);font-size:15px}
 .direct input[type=range]:disabled{opacity:.4}
+.direct-midi{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:13px;color:var(--muted);font-style:italic}
+.btn-small{padding:2px 10px;font-size:13px;font-style:normal}
 
 /* Name board */
 .nameboard{display:flex;flex-direction:column;align-items:flex-start;gap:4px;text-align:left;min-width:0}
