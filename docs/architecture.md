@@ -153,10 +153,10 @@ held keys when a coupler is drawn or retired.
 | Speech and Tone bloom | `core/speech.js`, `audio.js`, `controls.js` | `speechTime`, `windSpeech`, `onsetTau`, `BLOOM_LAG`, `ctl.speech`, `ctl.bloom` |
 | Vox Humana | `audio.js`, `core/fan.js`, `controls.js` | `applyVox`, `setFanShape`, `fanWaveCoefficients`, `lfoFreq`, `fanLow`, `shadow`, `refl`, `hiPan` |
 | Case and room | `audio.js` | `cabinetIR`, `impulse`, `applyMix`, `mix` |
-| Direct wind | `wind-loop.js`, `controls.js`, `autoplay.js`, `keys.js`, `state.js` | `S.directWind`, `ctl.directAir`, `#directOn`, `#airAmt`, MIDI CC2 |
+| Direct wind | `wind-loop.js`, `controls.js`, `autoplay.js`, `keys.js`, `state.js` | `S.directWind`, `ctl.directAir`, `#directOn`, `#airAmt`, MIDI CC2 and `S.directCC` (CC7 by default; `#directLearn`, `setDirectCC`) |
 | Easy wind | `core/wind.js`, `wind-loop.js`, `treadles.js`, `state.js` | `windDrain`, `EASY_REEDS`, `S.easyWind`, `#easyWind` |
 | Pedal autoplay | `autoplay.js`, `core/autoplay.js`, `controls.js`, `wind-loop.js` | `stepAutoplay`, `setupAutoplay`, `retime`, `pedalsAt`, `noteAt`, `reshape`, `METERS`, `ctl.tempo`, store key `autoplay` |
-| MIDI | `keys.js` | `connectMidi`, `onMidi` (notes, CC64 sustain, CC11/CC4 swell, CC120/123) |
+| MIDI | `keys.js` | `connectMidi`, `onMidi` (notes, CC64 sustain, CC11/CC4 swell, CC7 volume or Direct wind, CC2 Direct wind, CC120/123) |
 | All notes off | `keys.js`, `audio.js` | `allNotesOff`, `silenceAll`, `#panicBtn`, Escape; computer keys tracked by `KeyboardEvent.code` (`CODEMAP`, `keyId`) |
 | Compass | `keys.js`, `state.js` | `COMPASS`, `inCompass`, `couplesFor`, `S.compass` |
 | Volume, limiter, cabinet bass | `audio.js`, `core/output.js`, `controls.js` | `applyOutput`, `master`, `MASTER`, `limiterMakeupDb`, `softClipCurve`, `bassCut`, `ctl.volume`, `ctl.bassCut` |

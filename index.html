@@ -49,7 +49,8 @@
       <div class="field direct" data-info="direct">
         <div class="field-head info-host"><label class="check" for="directOn"><input type="checkbox" id="directOn"> Direct wind</label><output id="airOut" for="airAmt">2.0″</output></div>
         <input type="range" id="airAmt" min="0" max="36" step="1" value="20" disabled>
-        <p class="sub">Set the air in the reservoir yourself. While this is on, the slider is the only thing that moves the wind: the treadles, autoplay and helper pump add none, and playing uses none. 2.0″ is normal wind. A MIDI breath controller (CC2) moves it too.</p>
+        <div class="direct-midi"><span id="directCC">MIDI CC7 (volume knob)</span><button class="btn btn-small" id="directLearn" type="button">Learn</button></div>
+        <p class="sub">Set the air in the reservoir yourself. While this is on, the slider is the only thing that moves the wind: the treadles, autoplay and helper pump add none, and playing uses none. 2.0″ is normal wind. From a MIDI keyboard, the volume knob (CC7) or a breath controller (CC2) moves it; press Learn and turn any other knob to use that instead. With Direct wind off, the volume knob sets Volume.</p>
       </div>
       <div class="midi-row">
         <button class="btn" id="midiBtn" type="button">Connect MIDI</button>

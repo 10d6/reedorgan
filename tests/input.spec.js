@@ -172,3 +172,27 @@ test("Direct wind: the slider alone sets the reservoir; treadles, autoplay and p
   await expect(page.locator("#directOn")).toBeChecked();
   await expect(page.locator("#airOut")).toHaveText("3.6″");
 });
+
+test("the MIDI volume knob drives Direct wind when it's on and Volume when it's off; Learn binds another knob (D27)", async ({ page }) => {
+  await openOrgan(page, { quiet: false });
+  const cc = (n, v) => page.evaluate(([n, v]) => window.__midi(0xb0, n, v), [n, v]);
+  await page.click("#midiBtn");
+  await expect(page.locator("#directCC")).toHaveText("MIDI CC7 (volume knob)");
+  await cc(7, 64);                                              // Direct wind off: the knob is Volume
+  await expect(page.locator("#volumeOut")).toHaveText("50%");
+  await page.locator("#directOn").check();
+  await cc(7, 127);                                             // on: the knob is the wind
+  await expect(page.locator("#airOut")).toHaveText("3.6″");
+  await expect(page.locator("#volumeOut")).toHaveText("50%");   // and Volume stays put
+  await page.click("#directLearn");
+  await expect(page.locator("#directCC")).toHaveText("Move a knob or slider…");
+  await cc(21, 0);                                              // the knob that moves next is bound
+  await expect(page.locator("#directCC")).toHaveText("MIDI CC21");
+  await expect(page.locator("#directLearn")).toHaveText("Learn");
+  await cc(21, 71);
+  await expect(page.locator("#airOut")).toHaveText("2.0″");
+  await cc(7, 127);                                             // CC7 goes back to Volume once something else is learned
+  await expect(page.locator("#volumeOut")).toHaveText("100%");
+  await page.reload();
+  await expect(page.locator("#directCC")).toHaveText("MIDI CC21");
+});
