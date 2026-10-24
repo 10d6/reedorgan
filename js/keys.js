@@ -109,6 +109,7 @@ async function connectMidi() {
 function bindInputs() {
   const names = [];
   midiAccess.inputs.forEach(inp => { if (inp.state !== 'disconnected') { inp.onmidimessage = onMidi; names.push(inp.name || 'MIDI input'); } });
+  midiBtn.classList.toggle('attention', !names.length);   // orange until an input is listening (D25)
   if (names.length) setMidi('Listening to ' + names.join(', '), 'on');
   else setMidi('No MIDI inputs found. Plug one in and it connects automatically.');
 }
@@ -199,5 +200,6 @@ export function setupKeys() {
 
   /* MIDI */
   midiBtn = document.getElementById('midiBtn'); midiStatus = document.getElementById('midiStatus');
+  midiBtn.classList.add('attention');
   midiBtn.addEventListener('click', connectMidi);
 }

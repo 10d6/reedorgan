@@ -69,3 +69,47 @@ test("info buttons show and hide each section's explanations, and are remembered
   await page.locator('.info-btn[data-key="wind"]').click();
   await expect(page.getByText("A bigger reservoir holds a chord longer")).toBeHidden();
 });
+
+test("the status line sits under the gauge, so a long message doesn't move it (D25)", async ({ page }) => {
+  await openOrgan(page, { quiet: false });
+  const pos = await page.evaluate(() => {
+    const st = document.getElementById("status"), g = () => { const r = document.getElementById("gauge").getBoundingClientRect(); return [r.x, r.y]; };
+    st.textContent = "Wind is low"; const a = g(), sb = st.getBoundingClientRect();
+    st.textContent = "Helper can’t keep up; wind falling"; const b = g();
+    st.textContent = "Relief valve venting"; const c = g();
+    return { a, b, c, under: sb.top >= document.getElementById("gauge").getBoundingClientRect().bottom - 1 };
+  });
+  expect(pos.b).toEqual(pos.a);
+  expect(pos.c).toEqual(pos.a);
+  expect(pos.under).toBe(true);
+});
+
+test("Vox Humana controls fold away; drawing the stop opens them, retiring it doesn't close them (D25)", async ({ page }) => {
+  await openOrgan(page, { quiet: false });
+  const open = () => page.$eval("#voxPanel", (d) => d.open);
+  expect(await open()).toBe(false);
+  await expect(page.locator("#voxRate")).toBeHidden();
+  await page.getByRole("button", { name: "Vox Humana tremolo", exact: true }).click();
+  expect(await open()).toBe(true);
+  await expect(page.locator("#voxRate")).toBeVisible();
+  await page.getByRole("button", { name: "Vox Humana tremolo", exact: true }).click();
+  expect(await open()).toBe(true);                             // stays open when the stop is pushed in
+  await page.click("#voxPanel summary");
+  expect(await open()).toBe(false);                            // and folds by hand
+});
+
+test("Connect MIDI glows orange until an input is listening (D25)", async ({ page }) => {
+  await openOrgan(page, { quiet: false });
+  await expect(page.locator("#midiBtn")).toHaveClass(/attention/);
+  await page.click("#midiBtn");
+  await expect(page.locator("#midiStatus")).toHaveText("Listening to Test Keyboard");
+  await expect(page.locator("#midiBtn")).not.toHaveClass(/attention/);
+});
+
+test("new defaults: fan 9 Hz, blade shadow 50%, shimmer 10%; treadle noise 30% (D25)", async ({ page }) => {
+  await openOrgan(page, { quiet: false });
+  await expect(page.locator("#voxOut")).toHaveText("9.0 Hz");
+  await expect(page.locator("#voxShadowOut")).toHaveText("50%");
+  await expect(page.locator("#voxShimmerOut")).toHaveText("10%");
+  await expect(page.locator("#thumpOut")).toHaveText("30%");
+});

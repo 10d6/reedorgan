@@ -103,8 +103,9 @@ select{
 .divided .stop .nm{font-size:11.5px}
 .divided .stop .ft{font-size:11px}
 /* Vox Humana fan controls, under the stop knobs */
-.vox-panel{margin-top:18px;padding:14px 4px 0;border-top:1px solid rgba(201,160,82,.16);display:flex;flex-direction:column;gap:10px}
-.vox-panel .rail-label{margin:0}
+.vox-panel{margin-top:14px;padding-top:10px;border-top:1px solid rgba(201,160,82,.16)}
+.vox-body{display:flex;flex-direction:column;gap:10px;margin-top:12px;padding:0 4px}
+
 .vox-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px 20px;align-items:start}
 .vox-grid .field{min-width:0}
 .vox-grid select{width:100%}
@@ -117,7 +118,10 @@ select{
 .gauge{width:180px;max-width:100%;height:auto;display:block}
 .readouts{display:grid;grid-template-columns:auto auto;gap:2px 12px;font-family:var(--f-label);font-size:14px;color:var(--muted);align-items:baseline}
 .readouts b{font-family:var(--f-body);font-weight:500;color:var(--text);font-variant-numeric:tabular-nums;font-size:16px;text-align:right}
-.status{grid-column:1 / -1;min-height:1.4em;color:var(--warn);font-style:italic;font-size:14px}
+/* The status line sits under the gauge with room for two lines, so a longer
+   message never moves the gauge (D25). */
+.gauge-col{display:flex;flex-direction:column;align-items:center;gap:2px;width:180px;max-width:100%}
+.status{display:block;width:100%;min-height:2.9em;line-height:1.45;text-align:center;color:var(--warn);font-style:italic;font-size:14px}
 .status.ok{color:var(--muted)}
 .ctrls{display:grid;grid-template-columns:minmax(0,420px) minmax(0,1fr);gap:12px 32px;align-items:start;font-size:15px;flex:1;min-width:0}
 @media (max-width:680px){.ctrls{grid-template-columns:1fr}}
@@ -137,6 +141,9 @@ input[type=checkbox]{accent-color:var(--brass);width:17px;height:17px;margin:0}
   box-shadow:inset 0 1px 0 rgba(255,220,170,.12);
 }
 .btn:hover{border-color:var(--brass)}
+/* Connect MIDI glows orange until an input is listening (D25) */
+.btn.attention{border-color:var(--warn);box-shadow:0 0 0 1px var(--warn),0 0 10px rgba(229,138,90,.45),inset 0 1px 0 rgba(255,220,170,.12)}
+.btn.attention:hover{border-color:#f0a57d}
 .midi-status{font-size:13px;color:var(--muted);font-style:italic;margin:0;min-width:0}
 .midi-status.on{color:var(--good);font-style:normal}
 .midi-status.bad{color:var(--warn)}
@@ -239,14 +246,14 @@ kbd{font-family:var(--f-body);font-size:13px;border:1px solid var(--brass-dim);b
 .field-head.info-host{justify-content:flex-start}
 .field-head.info-host .info-btn{margin:0 auto 0 8px;align-self:center}
 .voicing-body{display:flex;flex-direction:column;gap:14px;margin-top:12px}
-.voicing summary{
+:is(.voicing,.vox-panel) summary{
   cursor:pointer;font-family:var(--f-label);font-size:12px;letter-spacing:.16em;text-transform:uppercase;
   color:var(--muted);padding:2px 4px;list-style:none;display:flex;align-items:center;gap:10px;
 }
-.voicing summary::-webkit-details-marker{display:none}
-.voicing summary::before{content:"";width:0;height:0;border:5px solid transparent;border-left:7px solid var(--brass);transition:transform .15s ease;transform-origin:3px 50%}
-.voicing[open] summary::before{transform:rotate(90deg)}
-.voicing summary:hover{color:var(--text)}
+:is(.voicing,.vox-panel) summary::-webkit-details-marker{display:none}
+:is(.voicing,.vox-panel) summary::before{content:"";width:0;height:0;border:5px solid transparent;border-left:7px solid var(--brass);transition:transform .15s ease;transform-origin:3px 50%}
+:is(.voicing,.vox-panel)[open] summary::before{transform:rotate(90deg)}
+:is(.voicing,.vox-panel) summary:hover{color:var(--text)}
 .voicing-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
 .rank-card{display:flex;flex-direction:column;gap:10px;padding:12px;border-radius:6px;background:rgba(0,0,0,.18);border:1px solid rgba(201,160,82,.18);min-width:0}
 .rank-name{margin:0;font-family:var(--f-display);font-size:16px;color:var(--brass)}
@@ -271,5 +278,5 @@ kbd{font-family:var(--f-body);font-size:13px;border:1px solid var(--brass-dim);b
   .treadle{height:84px}
 }
 @media (prefers-reduced-motion:reduce){
-  .stop,.white,.black,.voicing summary::before{transition:none}
+  .stop,.white,.black,:is(.voicing,.vox-panel) summary::before{transition:none}
 }

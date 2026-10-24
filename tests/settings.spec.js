@@ -12,6 +12,7 @@ test("slider, select and drawer settings survive a reload", async ({ page }) => 
   await setSlider(page, "aL", 900);                            // left treadle attack
   await page.selectOption("#split", "bc");
   await page.selectOption("#toneModel", "sweep");
+  await page.click("#voxPanel summary");                      // the fan's controls fold away (D25)
   await page.selectOption("#voxShape", "fan");
   await page.$eval("#voicing", (d) => { d.open = true; d.dispatchEvent(new Event("toggle")); });
   await page.reload();
@@ -25,6 +26,7 @@ test("slider, select and drawer settings survive a reload", async ({ page }) => 
   await expect(page.locator("#toneModel")).toHaveValue("sweep");
   await expect(page.locator("#voxShape")).toHaveValue("fan");
   expect(await page.$eval("#voicing", (d) => d.open)).toBe(true);
+  expect(await page.$eval("#voxPanel", (d) => d.open)).toBe(true);
 });
 
 test("linked treadle envelopes move together, unlinked ones don't", async ({ page }) => {

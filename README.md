@@ -17,7 +17,7 @@ changes the organ's loudness, brightness, pitch and how quickly notes speak.
 | Volume | The **Volume** slider. Above 100% a limiter keeps loud chords clean |
 | Stuck note | **All notes off** (top right), or `Esc` |
 | Explanations | Tap the small **i** beside any heading to show or hide what its controls do |
-| MIDI keyboard | Click **Connect MIDI** (top right). Works in Chrome, Edge, Opera and Firefox. Responds to notes, the sustain pedal (CC64), expression (CC11/CC4) and all-notes-off |
+| MIDI keyboard | Click **Connect MIDI** (top right; it glows orange until a keyboard is listening). Works in Chrome, Edge, Opera and Firefox. Responds to notes, the sustain pedal (CC64), expression (CC11/CC4) and all-notes-off |
 
 ## What's in it
 
@@ -38,7 +38,8 @@ changes the organ's loudness, brightness, pitch and how quickly notes speak.
   outside the reeds, so it only affects the upper harmonics: *Blade shadow*
   (flicker as blades pass), *Shimmer* (phasing from reflections off the moving
   blades) and *Stereo sweep*, all above a frequency set by *Blade size*. The
-  fundamentals, and so the overall loudness, stay steady. *Smooth* or *Spinning
+  fundamentals, and so the overall loudness, stay steady. Its controls fold
+  away under the stops and open when you draw the stop. *Smooth* or *Spinning
   fan* shape; the fan spins up when the stop is drawn and coasts down when it's
   retired. The earlier whole-sound tremolo is still there as *Whole-sound
   wobble* and *Lid wobble*, off by default.
