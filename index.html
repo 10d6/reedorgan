@@ -106,10 +106,10 @@ select{
 /* Vox Humana fan controls, under the stop knobs */
 .vox-panel{margin-top:18px;padding:14px 4px 0;border-top:1px solid rgba(201,160,82,.16);display:flex;flex-direction:column;gap:10px}
 .vox-panel .rail-label{margin:0}
-.vox-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px 20px;align-items:start}
+.vox-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px 20px;align-items:start}
 .vox-grid .field{min-width:0}
 .vox-grid select{width:100%}
-@media (max-width:860px){.vox-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.vox-grid .field:first-child{grid-column:1 / -1}}
+@media (max-width:860px){.vox-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (max-width:480px){.vox-grid{grid-template-columns:1fr}}
 
 /* Console: gauge + controls */
@@ -276,19 +276,32 @@ kbd{font-family:var(--f-body);font-size:13px;border:1px solid var(--brass-dim);b
           </select>
         </div>
         <div class="field">
-          <div class="field-head"><label for="voxVolAmt">Volume wobble</label><output id="voxVolOut" for="voxVolAmt">22%</output></div>
-          <input type="range" id="voxVolAmt" min="0" max="60" step="1" value="22">
+          <div class="field-head"><label for="voxBladeAmt">Blade size</label><output id="voxBladeOut" for="voxBladeAmt">above 1.5 kHz</output></div>
+          <input type="range" id="voxBladeAmt" min="0" max="100" step="1" value="52">
         </div>
         <div class="field">
-          <div class="field-head"><label for="voxToneAmt">Tone wobble</label><output id="voxToneOut" for="voxToneAmt">30%</output></div>
-          <input type="range" id="voxToneAmt" min="0" max="100" step="1" value="30">
+          <div class="field-head"><label for="voxShadowAmt">Blade shadow</label><output id="voxShadowOut" for="voxShadowAmt">35%</output></div>
+          <input type="range" id="voxShadowAmt" min="0" max="100" step="1" value="35">
+        </div>
+        <div class="field">
+          <div class="field-head"><label for="voxShimmerAmt">Shimmer</label><output id="voxShimmerOut" for="voxShimmerAmt">30%</output></div>
+          <input type="range" id="voxShimmerAmt" min="0" max="100" step="1" value="30">
         </div>
         <div class="field">
           <div class="field-head"><label for="voxStereoAmt">Stereo sweep</label><output id="voxStereoOut" for="voxStereoAmt">Off</output></div>
           <input type="range" id="voxStereoAmt" min="0" max="100" step="1" value="0">
         </div>
+        <div class="field">
+          <div class="field-head"><label for="voxWholeAmt">Whole-sound wobble</label><output id="voxWholeOut" for="voxWholeAmt">Off</output></div>
+          <input type="range" id="voxWholeAmt" min="0" max="60" step="1" value="0">
+        </div>
+        <div class="field">
+          <div class="field-head"><label for="voxLidAmt">Lid wobble</label><output id="voxLidOut" for="voxLidAmt">Off</output></div>
+          <input type="range" id="voxLidAmt" min="0" max="100" step="1" value="0">
+        </div>
       </div>
       <p class="sub" id="voxSub"></p>
+      <p class="sub">The fan stirs the sound after it leaves the reeds, so it only catches the upper harmonics: those above the blade-size frequency. Blade shadow is the flicker as blades pass; Shimmer is the phasing from sound bouncing off the moving blades; Stereo sweep moves those upper harmonics side to side. The fundamentals stay steady. Whole-sound wobble and Lid wobble are the earlier tremolo, which pulses everything; they're off by default.</p>
     </div>
   </section>
 
@@ -459,7 +472,7 @@ kbd{font-family:var(--f-body);font-size:13px;border:1px solid var(--brass-dim);b
   <div><h3>Slow-motion feet</h3><p>Give a treadle a long attack and release. The organ swells in and fades away on its own, like a very patient player.</p></div>
   <div><h3>The shimmer</h3><p>Draw Celeste with Diapason. The Celeste reeds are tuned a little sharp so the two ranks beat against each other in a slow wave. Celeste beat sets how fast, the same on every note.</p></div>
   <div><h3>Melody and accompaniment</h3><p>Divide the stops, then draw soft Melodia in the bass and Diapason with Celeste in the treble. The tune sings out over a quiet accompaniment.</p></div>
-  <div><h3>Swell and fan</h3><p>Vox Humana spins a little fan for a wavering tremolo. Try the Spinning fan shape with some Stereo sweep, and listen to it coast down when you push the stop in. The knee swell opens the lid gradually: louder and brighter, but it drinks wind faster.</p></div>
+  <div><h3>Swell and fan</h3><p>Vox Humana spins a little fan in front of the reeds. The fundamentals hold steady while the upper harmonics flicker and swirl. Try the Spinning fan shape with some Stereo sweep, and listen to it coast down when you push the stop in. The knee swell opens the lid gradually: louder and brighter, but it drinks wind faster.</p></div>
   <div><h3>Living tuning</h3><p>Hold a chord with Diapason and Melodia and pump unevenly. Every pair of reeds drifts at its own pace, so no single beat settles in. Fit a new set of reeds to hear a different instrument.</p></div>
   <div><h3>Couplers</h3><p>Draw Sub Octave and hold a chord: the keys an octave down sink with yours, and the bass grows heavy. Every coupled note is another set of reeds drinking wind.</p></div>
   <div><h3>Voice your own organ</h3><p>Open Rank voicing under Adjustments. Darken the Diapason, brighten the Principal, or detune a rank a few cents to hear how much a regulator's touch changes the instrument.</p></div>
@@ -488,7 +501,7 @@ const store={get(k,d){try{const v=localStorage.getItem('reed-'+k);return v==null
 
 let pressure=.5, lastSide=null, reliefT=0, started=false, swellPos=0, tonePress=.5;
 let ctx=null, waves, buses={bass:[],treble:[]}, swell, tilt, windGain, trem, lfo, lfoAmp, lfoFilt, windPitch, noiseGain;
-let fanPan, lfoPan, lfoPanAmt;
+let hiPan, lfoPan, lfoPanAmt, fanLow, shadow, lfoShadow, refl, reflGain, lfoRefl;
 let cabDry, cabWet, roomWet;
 let splitMode=SPLITS[store.get('split','none')]?store.get('split','none'):'none';
 const splitNote=()=>SPLITS[splitMode].note;
@@ -659,17 +672,27 @@ function applyMix(){
 }
 
 /* ---------- Vox Humana fan ----------
-   One low-frequency oscillator (lfo) drives three things: the volume (trem gain),
-   the tone (detune of the lid filter) and, through a second oscillator locked a
-   a quarter-turn ahead of it, the stereo position (fanPan). */
+   On a reed organ the Vox Humana is a small fan spun by its own wind wheel. It
+   doesn't touch the reeds' wind; it stirs the sound just outside the reed cells.
+   A blade a few centimetres across only shadows or reflects sound with a similar
+   or shorter wavelength, so the fan works on the upper harmonics and leaves the
+   fundamentals alone. The model splits the sound at the blade-size frequency:
+   the low band passes untouched; the upper band is shadowed as blades pass
+   (shadow gain), mixed with a reflection whose path length changes as the fan
+   turns (refl delay, giving a moving comb or phasing shimmer), and panned
+   (hiPan). The two bands sum back to the original exactly when the fan is still.
+   lfo is the blade-passing wave; lfoPan is a cosine started at the same moment,
+   a quarter-turn ahead, for the reflection path and the stereo position.
+   The old whole-sound tremolo (lfoAmp on trem gain, lfoFilt on the lid filter)
+   remains as Whole-sound wobble and Lid wobble. */
 const voxEl=document.getElementById('voxRate'),voxOut=document.getElementById('voxOut');
 voxEl.value=store.get('voxRate',5.6);
 const syncVox=()=>{voxOut.textContent=(+voxEl.value).toFixed(1)+' Hz';};
 voxEl.addEventListener('input',()=>{initAudio();syncVox();store.set('voxRate',+voxEl.value);applyVox();});
 syncVox();
 const VOX_SHAPES={
-  sine:'A smooth, even wobble. The fan turns only while the stop is drawn, takes a moment to spin up and coasts to a stop.',
-  fan:'Two blades sweep past the reeds, so the sound dips briefly with each pass instead of swaying evenly. The blades aren\u2019t quite matched, which gives a slight lilt.'
+  sine:'A smooth, even sway. The fan turns only while the stop is drawn, takes a moment to spin up and coasts to a stop.',
+  fan:'Two blades sweep past the reed cells, so the upper harmonics dip briefly with each pass instead of swaying evenly. The blades aren\u2019t quite matched, which gives a slight lilt.'
 };
 const voxShapeEl=document.getElementById('voxShape'),voxSub=document.getElementById('voxSub');
 let voxShape=VOX_SHAPES[store.get('voxShape','sine')]?store.get('voxShape','sine'):'sine';
@@ -678,9 +701,14 @@ voxShapeEl.addEventListener('change',()=>{
   initAudio();voxShape=voxShapeEl.value;store.set('voxShape',voxShape);voxSub.textContent=VOX_SHAPES[voxShape];
   if(ctx)setFanShape();applyVox();
 });
-const voxVolS   =bindSlider('voxVolAmt','voxVol',22, v=>v===0?'None':v+'%',()=>applyVox(),v=>v/100);
-const voxToneS  =bindSlider('voxToneAmt','voxTone',30, v=>v===0?'None':v+'%',()=>applyVox(),v=>v*4);   // 100% = ±400 cents on the lid filter
+const fmtHz=f=>f>=1000?(f/1000).toFixed(1)+' kHz':Math.round(f/10)*10+' Hz';
+// bigger blades reach further down the spectrum: 4 kHz (small) to 600 Hz (large)
+const voxBladeS =bindSlider('voxBladeAmt','voxBlade',52, (_,f)=>'above '+fmtHz(f),()=>applyVox(),logMap(4000,600));
+const voxShadowS=bindSlider('voxShadowAmt','voxShadow',35, v=>v===0?'None':v+'%',()=>applyVox(),v=>v/100);
+const voxShimS  =bindSlider('voxShimmerAmt','voxShimmer',30, v=>v===0?'None':v+'%',()=>applyVox(),v=>v/100);
 const voxStereoS=bindSlider('voxStereoAmt','voxStereo',0, v=>v===0?'Off':v+'%',()=>applyVox(),v=>v/100);
+const voxWholeS =bindSlider('voxWholeAmt','voxWhole',0, v=>v===0?'Off':v+'%',()=>applyVox(),v=>v/100);
+const voxLidS   =bindSlider('voxLidAmt','voxLid',0, v=>v===0?'Off':v+'%',()=>applyVox(),v=>v*4);   // 100% = ±400 cents on the lid filter
 // The spinning-fan shape covers one full turn of a two-bladed fan, so its
 // oscillator runs at half the speed shown (the speed is blade passes per second).
 const lfoFreq=()=>+voxEl.value*(voxShape==='fan'?.5:1);
@@ -704,9 +732,13 @@ function setFanShape(){
 // Drawing the stop spins the fan up; retiring it lets the fan coast down.
 function applyVox(){
   if(!ctx)return;const t=ctx.currentTime,on=stops.vox,tc=on?.4:.9;
-  lfoAmp.gain.setTargetAtTime(on?voxVolS.value:0,t,tc);
-  lfoFilt.gain.setTargetAtTime(on?voxToneS.value:0,t,tc);
+  fanLow.frequency.setTargetAtTime(voxBladeS.value,t,.05);
+  lfoShadow.gain.setTargetAtTime(on?voxShadowS.value*.5:0,t,tc);    // 100% = upper band dips to half
+  reflGain.gain.setTargetAtTime(on?voxShimS.value*.7:0,t,tc);
+  lfoRefl.gain.setTargetAtTime(on?.00015:0,t,tc);                   // reflection path swings ±5 cm
   lfoPanAmt.gain.setTargetAtTime(on?voxStereoS.value*.8:0,t,tc);
+  lfoAmp.gain.setTargetAtTime(on?voxWholeS.value:0,t,tc);
+  lfoFilt.gain.setTargetAtTime(on?voxLidS.value:0,t,tc);
   const f=on?lfoFreq():lfoFreq()*.25;
   [lfo,lfoPan].forEach(o=>o.frequency.setTargetAtTime(f,t,on?.5:1.2));
 }
@@ -867,8 +899,22 @@ function initAudio(){
   lfo.connect(lfoAmp).connect(trem.gain);lfo.connect(lfoFilt).connect(swell.detune);
   lfoPan=ctx.createOscillator();lfoPan.setPeriodicWave(cosWave());lfoPan.frequency.value=f0;
   lfoPanAmt=ctx.createGain();lfoPanAmt.gain.value=0;
-  fanPan=ctx.createStereoPanner();fanPan.pan.value=0;
-  lfoPan.connect(lfoPanAmt).connect(fanPan.pan);
+  // the fan stage: low band straight through, upper band shadowed, reflected and panned
+  const fanIn=ctx.createGain(),fanOut=ctx.createGain(),hiBand=ctx.createGain(),neg=ctx.createGain();
+  fanLow=ctx.createBiquadFilter();fanLow.type='lowpass';fanLow.Q.value=.5;fanLow.frequency.value=voxBladeS.value;
+  neg.gain.value=-1;
+  fanIn.connect(fanLow).connect(fanOut);
+  fanIn.connect(hiBand);fanLow.connect(neg).connect(hiBand);   // upper band = everything minus the low band
+  shadow=ctx.createGain();shadow.gain.value=1;
+  refl=ctx.createDelay(.01);refl.delayTime.value=.00025;           // blade about 4 cm from the reed cells
+  reflGain=ctx.createGain();reflGain.gain.value=0;
+  hiPan=ctx.createStereoPanner();hiPan.pan.value=0;
+  hiBand.connect(shadow);hiBand.connect(refl).connect(reflGain).connect(shadow);
+  shadow.connect(hiPan).connect(fanOut);
+  lfoShadow=ctx.createGain();lfoShadow.gain.value=0;lfo.connect(lfoShadow).connect(shadow.gain);
+  lfoRefl=ctx.createGain();lfoRefl.gain.value=0;lfoPan.connect(lfoRefl).connect(refl.delayTime);
+  lfoPan.connect(lfoPanAmt).connect(hiPan.pan);
+  trem.connect(fanIn);
   const tStart=ctx.currentTime+.02;lfo.start(tStart);lfoPan.start(tStart);   // started together so they stay locked
   const body1=ctx.createBiquadFilter();body1.type='peaking';body1.frequency.value=230;body1.Q.value=1;body1.gain.value=3;
   const body2=ctx.createBiquadFilter();body2.type='peaking';body2.frequency.value=1100;body2.Q.value=1.4;body2.gain.value=2;
@@ -883,7 +929,8 @@ function initAudio(){
   const cabSum=ctx.createGain();
   const master=ctx.createGain();master.gain.value=.8;
   HALVES.forEach(h=>RANKS.forEach((r,i)=>{const g=ctx.createGain();g.gain.value=stops[h][r.id]?rankLevel(i):0;g.connect(swell);buses[h][i]=g;}));
-  swell.connect(tilt).connect(windGain).connect(trem).connect(fanPan).connect(body1).connect(body2).connect(shelf);
+  swell.connect(tilt).connect(windGain).connect(trem);
+  fanOut.connect(body1).connect(body2).connect(shelf);
   // reeds → cabinet (dry + boxy reflections) → room (dry + long tail)
   shelf.connect(cabDry).connect(cabSum);shelf.connect(cabConv).connect(cabWet).connect(cabSum);
   cabSum.connect(dry).connect(comp);cabSum.connect(conv).connect(roomWet).connect(comp);

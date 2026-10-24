@@ -25,10 +25,14 @@ changes the organ's loudness, brightness, pitch and how quickly notes speak.
 - **Octave couplers**: Sub Octave and Super Octave pull down the keys an octave
   below or above, so each coupled note sounds with the stops drawn in its own
   half. Drawing one while holding a chord brings the octave in straight away.
-- **Vox Humana** fan tremolo. Speed, volume wobble, tone wobble and stereo sweep
-  are adjustable, with a *Smooth* or *Spinning fan* shape (brief dips as two
-  slightly mismatched blades pass). The fan spins up when the stop is drawn and
-  coasts down when it's retired.
+- **Vox Humana** fan. As on a real reed organ, the fan stirs the sound just
+  outside the reeds, so it only affects the upper harmonics: *Blade shadow*
+  (flicker as blades pass), *Shimmer* (phasing from reflections off the moving
+  blades) and *Stereo sweep*, all above a frequency set by *Blade size*. The
+  fundamentals, and so the overall loudness, stay steady. *Smooth* or *Spinning
+  fan* shape; the fan spins up when the stop is drawn and coasts down when it's
+  retired. The earlier whole-sound tremolo is still there as *Whole-sound
+  wobble* and *Lid wobble*, off by default.
 - A continuous **knee swell** that opens the lid gradually for a louder,
   brighter sound that uses more wind.
 - **Treadle envelopes**: each foot has its own attack, decay, sustain and release
