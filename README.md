@@ -11,8 +11,8 @@ changes the organ's loudness, brightness, pitch and how quickly notes speak.
 | What | How |
 | --- | --- |
 | Play notes | Click or touch the keys, or use the computer keyboard: `Z`–`M` for the low octave, `Q`–`U` and up for the middle |
-| Pump | Hold the Left and Right treadles, or hold `←` `→` (alternating fills fastest). `Space` pumps the next foot |
-| Steady wind | Raise **Helper pump** under Adjustments. If you play more than it supplies, the wind slowly runs out |
+| Pump | **Pedal autoplay** pumps for you from the first note (on by default). Or hold the Left and Right treadles, or hold `←` `→` (alternating fills fastest). `Space` pumps the next foot |
+| Steady wind | Speed up or busy the autoplay rhythm, or raise **Helper pump** under Adjustments (2% by default). If you play more than the wind supplies, it slowly runs out |
 | Swell | Move the **Knee swell** slider, or use a MIDI expression pedal (CC11 or CC4) |
 | Volume | The **Volume** slider. Above 100% a limiter keeps loud chords clean |
 | Stuck note | **All notes off**, or `Esc` |
@@ -47,6 +47,11 @@ changes the organ's loudness, brightness, pitch and how quickly notes speak.
   reedy rather than booming. Turn it down or Off for a deeper bass.
 - **Keyboard compass**: Full range (every MIDI note, A0 to C8) or a real reed
   organ's 61 keys, F to F, where couplers fall silent past the ends.
+- **Pedal autoplay**: works the treadles in a looping rhythm you set: 1 to 4
+  measures in 2/4, 3/4, 4/4, 5/4 or 6/8, a tempo from 30 to 200 bpm, and each
+  beat a Left or Right stroke, a rest, or a tie that holds the stroke longer.
+  The default is one bar of 4/4 at 100 bpm: right, left, half-note rest. That
+  carries a melody or a three-note chord; fuller playing needs a busier rhythm.
 - **Treadle envelopes**: each foot has its own attack, decay, sustain and release
   for the airflow, from 5 ms up to 30 s.
 - **Wind behaviour**: loudness rises up to about 2″ on the gauge and then levels

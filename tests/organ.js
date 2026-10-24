@@ -75,7 +75,9 @@ export async function openOrgan(page, { quiet = true } = {}) {
   await page.goto("/");
   await expect(page.locator("#keys .key").first()).toBeVisible();
   if (quiet) {
-    // Steady wind, nothing but the reeds: makes measurements repeatable.
+    // Steady wind, nothing but the reeds: makes measurements repeatable. Pedal
+    // autoplay is off, because its strokes ripple the wind (D22).
+    if (await page.locator("#autoOn").isChecked()) await page.locator("#autoOn").uncheck();
     for (const [id, v] of [["helper", 100], ["breathAmt", 0], ["thumpAmt", 0], ["roomAmt", 0], ["cabAmt", 0]]) await setSlider(page, id, v);
   }
   return errors;

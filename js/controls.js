@@ -2,6 +2,7 @@
 // setupControls() binds them to the page; the sound reads them through `ctl`.
 
 import { RANKS } from './core/ranks.js';
+import { retime } from './autoplay.js';
 import { HELPER_MAX } from './core/wind.js';
 import { volumeGain, bassCutHz } from './core/output.js';
 import { S, store } from './state.js';
@@ -139,9 +140,12 @@ export function setupControls() {
   ctl.voxWhole = bindSlider('voxWholeAmt', 'voxWhole', 0, v => v === 0 ? 'Off' : v + '%', () => applyVox(), v => v / 100);
   ctl.voxLid = bindSlider('voxLidAmt', 'voxLid', 0, v => v === 0 ? 'Off' : v + '%', () => applyVox(), v => v * 4);   // 100% = ±400 cents on the lid filter
 
+  /* ---- pedal autoplay tempo (D22) ---- */
+  ctl.tempo = bindSlider('tempoAmt', 'autoTempo', 100, v => v + ' bpm', () => retime());
+
   /* ---- helper pump ---- */
   const helperEl = $('helper'), helperOut = $('helperOut');
-  helperEl.value = store.get('helper', 0);
+  helperEl.value = store.get('helper', 2);   // 2% since D22: a trickle, so autoplay does most of the work
   const syncHelper = () => { const v = +helperEl.value; helperOut.textContent = v === 0 ? 'Off' : v + '% · ' + (v / 100 * HELPER_MAX).toFixed(2) + '/s'; };
   helperEl.addEventListener('input', () => { initAudio(); store.set('helper', +helperEl.value); syncHelper(); });
   syncHelper();

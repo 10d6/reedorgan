@@ -7,6 +7,7 @@ import { windSpeech, speechTime, onsetTau, onsetShape, RISE_PER_TAU, TILT_RATIO 
 import { reedRand, reedTri, reedError, reedWindResponse, lockReeds } from "../../js/core/reeds.js";
 import { windLevel, windBright, windCents, KNEE, P_REF, gaugeInches, toTime, toSlider, fmtT, stepEnvelope, DEFAULT_ENV } from "../../js/core/wind.js";
 import { fanWaveCoefficients } from "../../js/core/fan.js";
+import { METERS, DEFAULT_PATTERN, normalise, reshape, nextCell, cellSeconds, noteAt, pedalsAt, liftGap } from "../../js/core/autoplay.js";
 import { volumeGain, bassCutHz, limiterMakeupDb, softClip, softClipCurve } from "../../js/core/output.js";
 
 const near = (a, b, tol, msg) => assert.ok(Math.abs(a - b) <= tol, `${msg ?? ""} expected ${b} ± ${tol}, got ${a}`);
@@ -193,4 +194,43 @@ test("D20: Volume, limiter make-up and the soft-clip ceiling", () => {
 
 test("D19: Cabinet bass slider maps to a 20–200 Hz corner, bottom is Off", () => {
   near(bassCutHz(60), 79.6, 0.1); near(bassCutHz(100), 200, 1e-9); assert.ok(bassCutHz(0) < 10);
+});
+
+test("D22: the default autoplay pattern is one bar of 4/4, right and left quarter notes then a half rest", () => {
+  const p = normalise(DEFAULT_PATTERN);
+  assert.deepEqual(p, { on: true, meter: "4/4", measures: 1, cells: ["R", "L", "-", "-"] });
+  const c = cellSeconds(100);                                  // 0.6 s a beat
+  near(c, 0.6, 1e-12);
+  const at = (t) => pedalsAt(p.cells, c, t);
+  assert.deepEqual(at(0.05), { L: false, R: true, index: 0 });
+  assert.deepEqual(at(0.65), { L: true, R: false, index: 1 });
+  assert.deepEqual(at(1.3), { L: false, R: false, index: 2 });
+  assert.deepEqual(at(1.9), { L: false, R: false, index: 3 });
+  assert.deepEqual(at(2.45), { L: false, R: true, index: 0 }, "loops after 2.4 s");
+  assert.equal(at(0.6 - liftGap(c) + 0.01).R, false, "lifts just before the next beat");
+});
+
+test("D22: ties lengthen a stroke, wrap around the loop, and tie after a rest is silent", () => {
+  const c = 0.5;
+  const half = noteAt(["L", "~", "R", "-"], c, 0.7);
+  assert.equal(half.foot, "L"); near(half.start, 0, 1e-12); near(half.end, 1.0, 1e-12);
+  const wrap = noteAt(["~", "-", "-", "R"], c, 2.1);           // the tie on beat 1 holds beat 4's R into the next loop
+  assert.equal(wrap.foot, "R"); near(wrap.start, 1.5, 1e-12); near(wrap.end, 2.5, 1e-12);
+  assert.equal(noteAt(["-", "~", "-", "-"], c, 0.7).foot, null);
+  assert.equal(noteAt(["~", "~"], c, 0.2).foot, null, "all ties is silence");
+  // two strokes in a row on the same foot are separate strokes
+  const same = ["R", "R"]; assert.equal(pedalsAt(same, c, 0.49).R, false); assert.equal(pedalsAt(same, c, 0.51).R, true);
+});
+
+test("D22: editing: cycle order, reshaping meters and measures, and cleaning bad saved data", () => {
+  assert.deepEqual(["-", "L", "R", "~"].map(nextCell), ["L", "R", "~", "-"]);
+  const p = normalise({ meter: "4/4", measures: 2, cells: ["R", "L", "-", "~", "L", "R", "R", "L"] });
+  const three = reshape(p, "3/4", 2);
+  assert.deepEqual(three.cells, ["R", "L", "-", "L", "R", "R"], "each measure keeps its first beats");
+  const six = reshape(three, "6/8", 3);
+  assert.deepEqual(six.cells, ["R", "L", "-", "-", "-", "-", "L", "R", "R", "-", "-", "-", "-", "-", "-", "-", "-", "-"]);
+  assert.equal(six.cells.length, 3 * METERS["6/8"].beats);
+  assert.deepEqual(normalise({ meter: "7/9", measures: 9, cells: ["X"] }).cells.length, 16, "bad meter → 4/4, measures capped at 4");
+  assert.equal(normalise(null).on, true);
+  assert.equal(normalise({ on: false }).on, false);
 });

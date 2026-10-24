@@ -20,6 +20,7 @@ The config starts `scripts/serve.mjs` on port 8123 automatically.
 | File | Checks |
 | --- | --- |
 | `page.spec.js` | Loads with no script errors; every slider shows a value; no sideways scrolling at 1280, 700 and 390 px; keyboard size. |
+| `autoplay.spec.js` | Pedal autoplay defaults (on, 4/4, 1 bar, 100 bpm, R L rest) and helper 2%; it waits for the first note, then strokes right, left a beat apart and loops each bar; it holds the wind up for one note and lets it fall when turned off; editing cells, meter and measures, and all of it saved. |
 | `stops.spec.js` | Default stops; one reed per drawn stop; divided stops at both split points; undividing; couplers pulling keys and following held chords; reference-counted notes. |
 | `input.spec.js` | Mouse drag across keys; computer-key mapping; the wind running out and treadles refilling it; MIDI notes, sustain, expression (CC11/CC4) and all-notes-off; Space pumping; the All notes off button and Escape; Shift and Command can't leave keys stuck; Keyboard compass. |
 | `settings.spec.js` | Settings survive a reload; linked and unlinked treadle envelopes; factory voicing reset; fitting new reeds; readout formats. |
@@ -38,13 +39,13 @@ entry together, and say so in the PR.
 - **Fake MIDI keyboard.** `navigator.requestMIDIAccess` returns one input the tests play with `window.__midi(status, data1, data2)`.
 - **Sampling.** `window.__sample(ms)` records per-band power (below 400 Hz, above 2 kHz, everything, below 160 Hz) for each ear every 8 ms. `measure()` turns that into how far each band moves in dB (5th to 95th percentile) and how far it swings between left and right.
 
-Measurements use a held A3 on the Diapason alone, with steady wind (helper pump at 100%), and with breath noise, treadle noise, cabinet and room turned off.
+Measurements use a held A3 on the Diapason alone, with steady wind (helper pump at 100%, Pedal autoplay off), and with breath noise, treadle noise, cabinet and room turned off.
 
 ## The contract with the page
 
 The tests are black-box, so they rely only on what a player can see and use. Keep these stable, or update the tests in the same PR:
 
-- **Element ids:** sliders end in `Amt` with an `<output>` ending in `Out`. Other ids used: `keys`, `stops`, `split`, `compass`, `panicBtn`, `toneModel`, `voxShape`, `voicing`, `voicingReset`, `newReeds`, `midiBtn`, `midiStatus`, `link`, the treadle envelope sliders `aL`/`aR` with `aoL`/`aoR`, `flowL`, and the readouts `rWind`, `rPitch`, `rReeds`, `status`.
+- **Element ids:** sliders end in `Amt` with an `<output>` ending in `Out`. Other ids used: `keys`, `stops`, `split`, `compass`, `panicBtn`, `autoOn`, `meter`, `measures`, `autoGrid` (its `.beat` buttons carry `data-v` = `L`, `R`, `-` or `~`, `aria-label` "Measure m, beat b: …", and the class `now` under the playhead), `flowR`, `toneModel`, `voxShape`, `voicing`, `voicingReset`, `newReeds`, `midiBtn`, `midiStatus`, `link`, the treadle envelope sliders `aL`/`aR` with `aoL`/`aoR`, `flowL`, and the readouts `rWind`, `rPitch`, `rReeds`, `status`.
 - **Keys:** `#keys .key` elements with `data-midi`; a pressed key has the class `down`; the split notch is `.white.split`.
 - **Stops:** buttons with `aria-pressed` and accessible names such as `Diapason 8′`, `Bass Melodia 8′`, `Vox Humana tremolo` and `Sub octave coupler`. Group captions are `.group-label`.
 - **Computer keys:** `Z`–`M` from C3, `Q`–`U` from C4, `I` = C5, matched by physical key; arrows and Space pump; Escape is all notes off.
