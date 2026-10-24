@@ -1,0 +1,13 @@
+{
+  "name": "reedorgan",
+  "private": true,
+  "description": "Parlor Reed Organ: development tooling only. The site itself needs no build or install.",
+  "scripts": {
+    "check": "node scripts/check.mjs",
+    "serve": "node scripts/serve.mjs",
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.56.0"
+  }
+}

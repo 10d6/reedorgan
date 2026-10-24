@@ -9,7 +9,10 @@ exists. For *why* things are built this way, see [decisions.md](decisions.md).
 | --- | --- |
 | `index.html` | The whole instrument: markup, CSS (`<style>`) and the Web Audio script (one `<script>`, wrapped in an IIFE). |
 | `scripts/check.mjs` | Static checks: document shape, script syntax, element ids, allowed external hosts. |
-| `.github/workflows/check.yml` | Runs the checks on every PR and on `main`. |
+| `.github/workflows/check.yml` | Runs the static checks and the browser tests on every PR and on `main`. |
+| `tests/` | Playwright tests that play the organ and measure its sound. See `tests/README.md`. |
+| `scripts/serve.mjs` | A dependency-free static server for local play and tests (`npm run serve`). |
+| `package.json` | Development tooling only (Playwright). The site itself needs no install. |
 | `docs/` | This file and the decision log. |
 
 GitHub Pages serves the root of `main` directly; there is no build step.
