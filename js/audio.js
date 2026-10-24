@@ -5,12 +5,13 @@ import { RANKS, HALVES, noteFreq, waveRecipe, loudnessComp, celesteCents } from 
 import { reedError, reedWindResponse, lockReeds } from './core/reeds.js';
 import { windLevel, windBright, windCents, P_REF } from './core/wind.js';
 import { fanWaveCoefficients } from './core/fan.js';
+import { speechTime, onsetTau, BLOOM_LAG, TILT_RATIO } from './core/speech.js';
 import { S, stops, voices, halfOf } from './state.js';
 import { ctl, mix } from './controls.js';
 import { markKey } from './keys.js';
 
 export let ctx = null;
-let waves, buses = { bass: [], treble: [] }, swell, tilt, windGain, trem, lfo, lfoAmp, lfoFilt, windPitch, noiseGain;
+let waves, buses = { bass: [], treble: [] }, swell, tiltDb, windGain, trem, lfo, lfoAmp, lfoFilt, windPitch, noiseGain;
 let hiPan, lfoPan, lfoPanAmt, fanLow, shadow, lfoShadow, refl, reflGain, lfoRefl;
 let cabDry, cabWet, roomWet;
 
@@ -119,7 +120,8 @@ export function initAudio() {
   ctx = new AC();
   waves = RANKS.map((_, i) => rankWave(i));
   swell = ctx.createBiquadFilter(); swell.type = 'lowpass'; swell.Q.value = ctl.toneQ.value; swell.frequency.value = 2300;
-  tilt = ctx.createBiquadFilter(); tilt.type = 'highshelf'; tilt.frequency.value = 1200; tilt.gain.value = 0;
+  // the wind's tone tilt in dB, fed to every reed's own tone shelf (D17)
+  tiltDb = ctx.createConstantSource(); tiltDb.offset.value = 0; tiltDb.start();
   windGain = ctx.createGain(); windGain.gain.value = 0;
   trem = ctx.createGain(); trem.gain.value = 1;
   const f0 = stops.vox ? lfoFreq() : lfoFreq() * .25;
@@ -159,7 +161,7 @@ export function initAudio() {
   const cabSum = ctx.createGain();
   const master = ctx.createGain(); master.gain.value = .8;
   HALVES.forEach(h => RANKS.forEach((r, i) => { const g = ctx.createGain(); g.gain.value = stops[h][r.id] ? rankLevel(i) : 0; g.connect(swell); buses[h][i] = g; }));
-  swell.connect(tilt).connect(windGain).connect(trem);
+  swell.connect(windGain).connect(trem);
   fanOut.connect(body1).connect(body2).connect(shelf);
   // reeds → cabinet (dry + boxy reflections) → room (dry + long tail)
   shelf.connect(cabDry).connect(cabSum); shelf.connect(cabConv).connect(cabWet).connect(cabSum);
@@ -193,11 +195,12 @@ export function applyWind(sounding) {
   if (S.toneModel === 'sweep') {
     // depth 100% reproduces the original sweep exactly
     swell.frequency.setTargetAtTime(450 + 4200 * Math.pow(Math.max(0, bRef + dBright), 1.4) * (1 + .7 * S.swellPos), t, .04);
-    tilt.gain.setTargetAtTime(0, t, .05);
+    tiltDb.offset.setTargetAtTime(0, t, .05);
   } else {
     // the lid filter sits where the sweep would at a mid-gauge reading; only the swell moves it
     swell.frequency.setTargetAtTime(2300 * (1 + 1.4 * S.swellPos), t, .04);
-    tilt.gain.setTargetAtTime(Math.max(-24, 18 * dBright), t, .04);   // about −7 dB empty, +3 dB full at 60%
+    // each reed's harmonics tilt against its own fundamental (D17): about −7 dB empty, +3 dB full at 60%
+    tiltDb.offset.setTargetAtTime(Math.max(-24, 18 * dBright), t, .04);
   }
   windPitch.offset.setTargetAtTime(windCents(p, ctl.sens.value), t, .05);   // flat as the wind rises (D12)
   noiseGain.gain.setTargetAtTime(.025 * p * Math.min(1, sounding / 3) * ctl.breath.value, t, .05);
@@ -223,7 +226,6 @@ export function noteOn(m) {
   if (v) killVoice(v, .01);
   const t = ctx.currentTime, f = noteFreq(m);
   const speech = ctl.speech.value;
-  const tc = (.012 + .06 * (1 - Math.min(1, S.pressure))) * speech;   // low wind = slower speech
   const amp = .11 * Math.max(.55, 1 - (m - 48) * .006);
   const half = halfOf(m);
   v = { refs: 1, oscs: [], envs: [], winds: [], released: false, half, f, m };
@@ -236,13 +238,26 @@ export function noteOn(m) {
     o.detune.setValueAtTime(base + ctl.scoop.value, t); o.detune.setTargetAtTime(base, t, .04 * speech);
     const w = ctx.createGain(); w.gain.value = tun.winds[i];   // this reed's own response to the wind
     windPitch.connect(w).connect(o.detune);
-    const g = ctx.createGain(); g.gain.setValueAtTime(0, t); g.gain.setTargetAtTime(amp, t, tc);
+    // Speech (D16): the swing grows S-shaped, (1 − e^(−t/τ))², slower for low
+    // reeds and low wind. g carries one factor and the release; on the other.
+    const fr = f * r.mult, tau = onsetTau(speechTime(fr, S.pressure, speech));
+    const g = ctx.createGain(); g.gain.setValueAtTime(0, t); g.gain.setTargetAtTime(amp, t, tau);
+    const on = ctx.createGain(); on.gain.setValueAtTime(0, t); on.gain.setTargetAtTime(1, t, tau);
+    // Tone (D17): a shelf between this reed's fundamental and 2nd harmonic. Its
+    // own gain starts Bloom dB down and opens as the swing grows, a little
+    // behind it; the wind's tilt is added on top through tiltDb.
+    const sh = ctx.createBiquadFilter(); sh.type = 'highshelf'; sh.frequency.value = fr * TILT_RATIO;
+    sh.gain.setValueAtTime(-ctl.bloom.value, t); sh.gain.setTargetAtTime(0, t, tau * BLOOM_LAG);
+    tiltDb.connect(sh.gain);
     // Start phase (D14): a reed starts wherever it happens to be in its swing.
     // Locked reeds start nearly together (within ±0.1 cycle) so their blend
     // varies a little from note to note without ever cancelling; free reeds start anywhere.
     const cyc = tun.locked[i] ? .1 + (Math.random() - .5) * .2 : Math.random();
-    o.connect(g).connect(buses[half][i]); o.start(t + cyc / (f * r.mult));
-    o.onended = () => { try { windPitch.disconnect(w); } catch (e) {} w.disconnect(); g.disconnect(); };
+    o.connect(sh).connect(g).connect(on).connect(buses[half][i]); o.start(t + cyc / fr);
+    o.onended = () => {
+      try { windPitch.disconnect(w); } catch (e) {} try { tiltDb.disconnect(sh.gain); } catch (e) {}
+      w.disconnect(); sh.disconnect(); g.disconnect(); on.disconnect();
+    };
     v.oscs.push(o); v.envs.push(g); v.winds.push(w);
   });
   voices.set(m, v); markKey(m, true);

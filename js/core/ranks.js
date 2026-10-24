@@ -1,9 +1,9 @@
 // The ranks of reeds and the maths of their tone. Pure: no page, no audio.
 
 export const RANKS = [
-  { id: 'bourdon',   nm: 'Bourdon',   ft: '16′', mult: .5, wave: 'mellow', det: 0, level: .85 },
+  { id: 'bourdon',   nm: 'Bourdon',   ft: '16′', mult: .5, wave: 'bass',   det: 0, level: .914 },
   { id: 'diapason',  nm: 'Diapason',  ft: '8′',  mult: 1,  wave: 'reed',   det: 0, level: 1 },
-  { id: 'melodia',   nm: 'Melodia',   ft: '8′',  mult: 1,  wave: 'mellow', det: 0, level: .9 },
+  { id: 'melodia',   nm: 'Melodia',   ft: '8′',  mult: 1,  wave: 'mellow', det: 0, level: .868 },
   { id: 'celeste',   nm: 'Celeste',   ft: '8′',  mult: 1,  wave: 'reed',   det: 0, level: .75, celeste: true },
   { id: 'principal', nm: 'Principal', ft: '4′',  mult: 2,  wave: 'thin',   det: 0, level: .5 },
 ];
@@ -20,8 +20,18 @@ export const SPLITS = {
 export const noteFreq = m => 440 * Math.pow(2, (m - 69) / 12);
 
 // Factory harmonic recipes: strength of even harmonics relative to odd, and how
-// steeply the upper harmonics fall away (amplitude ∝ 1/k^exp).
-export const WAVE_SPECS = { reed: { even: .55, exp: .85, n: 40 }, mellow: { even: .3, exp: 1.9, n: 16 }, thin: { even: .7, exp: 1.15, n: 40 } };
+// steeply the upper harmonics fall away (amplitude ∝ 1/k^exp). Even a mellow free
+// reed keeps clear 2nd and 3rd harmonics (D15); `bass` is the Bourdon's big,
+// buzzier reeds. Rank levels are set so each rank's loudness matches the
+// earlier recipes.
+export const WAVE_SPECS = {
+  reed: { even: .55, exp: .85, n: 40 },
+  mellow: { even: .4, exp: 1.25, n: 24 },
+  bass: { even: .5, exp: 1.1, n: 40 },
+  thin: { even: .7, exp: 1.15, n: 40 },
+};
+// The harmonic recipes before D15, kept so the tests can check loudness stayed put.
+export const WAVE_SPECS_V1 = { mellow: { even: .3, exp: 1.9, n: 16 } };
 
 // Brightness (−1…1) bends the harmonic rolloff: brighter keeps more of the upper harmonics.
 export function waveRecipe(rank, bright) {
