@@ -3,8 +3,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { RANKS, CELESTE, SPLITS, noteFreq, waveRecipe, scaledRms, loudnessComp, celesteCents } from "../../js/core/ranks.js";
-import { reedRand, reedTri, reedError, reedWindResponse } from "../../js/core/reeds.js";
-import { windLevel, windBright, KNEE, P_REF, gaugeInches, toTime, toSlider, fmtT, stepEnvelope, DEFAULT_ENV } from "../../js/core/wind.js";
+import { reedRand, reedTri, reedError, reedWindResponse, lockReeds } from "../../js/core/reeds.js";
+import { windLevel, windBright, windCents, KNEE, P_REF, gaugeInches, toTime, toSlider, fmtT, stepEnvelope, DEFAULT_ENV } from "../../js/core/wind.js";
 import { fanWaveCoefficients } from "../../js/core/fan.js";
 
 const near = (a, b, tol, msg) => assert.ok(Math.abs(a - b) <= tol, `${msg ?? ""} expected ${b} ± ${tol}, got ${a}`);
@@ -111,4 +111,38 @@ test("treadle envelopes: times map both ways and the ADSR steps through its stag
   P.stage = "r"; P.relFrom = P.lvl;
   for (let i = 0; i < 20; i++) stepEnvelope(P, .01);
   assert.equal(P.stage, "idle"); assert.equal(P.lvl, 0);
+});
+
+test("D12: free reeds go flat as the wind rises", () => {
+  assert.equal(windCents(P_REF, 10), 0);
+  assert.ok(windCents(1, 10) < 0, "full wind is flat");
+  assert.ok(windCents(0.2, 10) > 0, "low wind is sharp");
+  near(windCents(1, 10) - windCents(0, 10), -10, 1e-9, "Pitch drift is the span across the gauge");
+});
+
+test("D14: Unison pull locks close unison reeds and leaves the Celeste alone", () => {
+  const cents = [0.4, -0.6, 0.9, 2.1, 0.1], winds = [1.2, 1.0, 0.8, 1.1, 0.9];
+  const lockable = [true, true, true, false, true];
+  const r = lockReeds(cents, winds, lockable, 3);
+  assert.deepEqual(r.locked, [true, true, true, false, true]);
+  const c = (0.4 - 0.6 + 0.9 + 0.1) / 4, w = (1.2 + 1.0 + 0.8 + 0.9) / 4;
+  for (const i of [0, 1, 2, 4]) { near(r.cents[i], c, 1e-12); near(r.winds[i], w, 1e-12); }
+  assert.equal(r.cents[3], 2.1, "Celeste keeps its offset");
+  assert.equal(r.winds[3], 1.1);
+  assert.deepEqual(cents, [0.4, -0.6, 0.9, 2.1, 0.1], "inputs untouched");
+});
+
+test("D14: reeds outside the pull range stay free; Off and lone reeds never lock", () => {
+  const r = lockReeds([0, 0.5, 6, 0, 0], [1, 1, 1, 1, 1], [true, true, true, false, false], 2);
+  assert.deepEqual(r.locked, [true, true, false, false, false]);
+  assert.equal(r.cents[2], 6);
+  assert.deepEqual(lockReeds([0, 0.5], [1, 1], [true, true], 0).locked, [false, false]);
+  assert.deepEqual(lockReeds([0, 0.5], [1, 1], [true, false], 3).locked, [false, false]);
+});
+
+test("D14: at default scatter (±1 ¢) and pull (3 ¢), every key's unison ranks lock", () => {
+  for (const seed of [1, 7, 12345]) for (let m = 36; m <= 96; m++) {
+    const cents = [0, 1, 2, 4].map((i) => reedError(seed, i, m, 1));
+    assert.ok(lockReeds(cents, [1, 1, 1, 1], [true, true, true, true], 3).locked.every(Boolean), `seed ${seed} key ${m}`);
+  }
 });

@@ -2,8 +2,8 @@
 // it. See docs/architecture.md for the signal flow.
 
 import { RANKS, HALVES, noteFreq, waveRecipe, loudnessComp, celesteCents } from './core/ranks.js';
-import { reedError, reedWindResponse } from './core/reeds.js';
-import { windLevel, windBright, P_REF } from './core/wind.js';
+import { reedError, reedWindResponse, lockReeds } from './core/reeds.js';
+import { windLevel, windBright, windCents, P_REF } from './core/wind.js';
 import { fanWaveCoefficients } from './core/fan.js';
 import { S, stops, voices, halfOf } from './state.js';
 import { ctl, mix } from './controls.js';
@@ -25,6 +25,14 @@ export function rankCents(i, f, m) {
   return (r.celeste ? celesteCents(ctl.beat.value, f * r.mult) : r.det) + ctl.voicing[i].tune.value + reedError(S.reedSeed, i, m, ctl.scatter.value);
 }
 const reedWind = (i, m) => reedWindResponse(S.reedSeed, i, m, ctl.driftVar.value);
+// The tuning of every reed on key m in half h: settled offsets in cents, wind
+// responses, and which reeds Unison pull has locked together (D14). Only drawn,
+// non-Celeste stops can lock: a silent reed can't pull anything.
+function keyTuning(f, m, h) {
+  const cents = RANKS.map((_, i) => rankCents(i, f, m)), winds = RANKS.map((_, i) => reedWind(i, m));
+  const lockable = RANKS.map(r => !r.celeste && !!stops[h][r.id]);
+  return lockReeds(cents, winds, lockable, ctl.pull.value);
+}
 function makeWave({ amp, n }) {
   const re = new Float32Array(n + 1), im = new Float32Array(n + 1);
   for (let k = 1; k <= n; k++) im[k] = amp(k);
@@ -169,7 +177,7 @@ export function initAudio() {
 export function applyStops() {
   if (!ctx) return; const t = ctx.currentTime;
   HALVES.forEach(h => RANKS.forEach((r, i) => buses[h][i].gain.setTargetAtTime(stops[h][r.id] ? rankLevel(i) : 0, t, .04)));
-  applyVox();
+  applyVox(); retune();   // drawing a stop can pull sounding reeds into step (D14)
 }
 
 /* ---------- the wind, each frame ---------- */
@@ -191,7 +199,7 @@ export function applyWind(sounding) {
     swell.frequency.setTargetAtTime(2300 * (1 + 1.4 * S.swellPos), t, .04);
     tilt.gain.setTargetAtTime(Math.max(-24, 18 * dBright), t, .04);   // about −7 dB empty, +3 dB full at 60%
   }
-  windPitch.offset.setTargetAtTime((p - P_REF) * ctl.sens.value, t, .05);
+  windPitch.offset.setTargetAtTime(windCents(p, ctl.sens.value), t, .05);   // flat as the wind rises (D12)
   noiseGain.gain.setTargetAtTime(.025 * p * Math.min(1, sounding / 3) * ctl.breath.value, t, .05);
 }
 
@@ -219,33 +227,39 @@ export function noteOn(m) {
   const amp = .11 * Math.max(.55, 1 - (m - 48) * .006);
   const half = halfOf(m);
   v = { refs: 1, oscs: [], envs: [], winds: [], released: false, half, f, m };
+  const tun = keyTuning(f, m, half);
   RANKS.forEach((r, i) => {
     const o = ctx.createOscillator(); o.setPeriodicWave(waves[i]);
     o.frequency.value = f * r.mult;
-    const base = rankCents(i, f, m);
-    o.detune.setValueAtTime(base - ctl.scoop.value, t); o.detune.setTargetAtTime(base, t, .04 * speech);
-    const w = ctx.createGain(); w.gain.value = reedWind(i, m);   // this reed's own response to the wind
+    const base = tun.cents[i];
+    // a free reed starts near its natural pitch and settles a little flat as its swing grows (D13)
+    o.detune.setValueAtTime(base + ctl.scoop.value, t); o.detune.setTargetAtTime(base, t, .04 * speech);
+    const w = ctx.createGain(); w.gain.value = tun.winds[i];   // this reed's own response to the wind
     windPitch.connect(w).connect(o.detune);
     const g = ctx.createGain(); g.gain.setValueAtTime(0, t); g.gain.setTargetAtTime(amp, t, tc);
-    o.connect(g).connect(buses[half][i]); o.start(t);
+    // Start phase (D14): a reed starts wherever it happens to be in its swing.
+    // Locked reeds start nearly together (within ±0.1 cycle) so their blend
+    // varies a little from note to note without ever cancelling; free reeds start anywhere.
+    const cyc = tun.locked[i] ? .1 + (Math.random() - .5) * .2 : Math.random();
+    o.connect(g).connect(buses[half][i]); o.start(t + cyc / (f * r.mult));
     o.onended = () => { try { windPitch.disconnect(w); } catch (e) {} w.disconnect(); g.disconnect(); };
     v.oscs.push(o); v.envs.push(g); v.winds.push(w);
   });
   voices.set(m, v); markKey(m, true);
 }
-// Tuning and Celeste beat changes retune notes that are already sounding.
-export function retune(i) {
+// Tuning, Celeste beat, Unison pull and stop changes retune notes that are
+// already sounding. Locking ties ranks together, so every rank is updated.
+export function retune() {
   if (!ctx) return; const t = ctx.currentTime;
   for (const v of voices.values()) {
     if (v.released) continue;
-    v.oscs[i].detune.setTargetAtTime(rankCents(i, v.f, v.m), t, .08);
+    const tun = keyTuning(v.f, v.m, v.half);
+    v.oscs.forEach((o, i) => o.detune.setTargetAtTime(tun.cents[i], t, .08));
+    v.winds.forEach((w, i) => w.gain.setTargetAtTime(tun.winds[i], t, .08));
   }
 }
 // Drift variation and new reeds change how sounding reeds follow the wind.
-export function rewind() {
-  if (!ctx) return; const t = ctx.currentTime;
-  for (const v of voices.values()) if (!v.released) v.winds.forEach((w, i) => w.gain.setTargetAtTime(reedWind(i, v.m), t, .08));
-}
+export const rewind = retune;
 // Brightness changes swap the harmonic recipe on sounding notes too.
 export function revoice(i) {
   updateComp(i);

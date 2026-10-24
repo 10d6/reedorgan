@@ -17,7 +17,7 @@ exists. For *why* things are built this way, see [decisions.md](decisions.md).
 | `js/stops.js` | Stop rail and the divided-stops selector. |
 | `js/treadles.js` | The two treadles: ADSR state (`ped`), pedals, envelope pictures, `gateOn`/`gateOff`. |
 | `js/wind-loop.js` | The per-frame control loop (`frame`), the gauge and readouts. |
-| `js/core/*.js` | Pure maths, with no page or audio access: `ranks.js` (ranks, waveforms, brightness compensation, Celeste), `reeds.js` (per-reed scatter and wind response), `wind.js` (loudness and brightness against pressure, treadle envelopes), `fan.js` (the spinning-fan wave). |
+| `js/core/*.js` | Pure maths, with no page or audio access: `ranks.js` (ranks, waveforms, brightness compensation, Celeste), `reeds.js` (per-reed scatter, wind response and Unison pull), `wind.js` (loudness, brightness and pitch against pressure, treadle envelopes), `fan.js` (the spinning-fan wave). |
 | `tests/*.spec.js` | Playwright tests that play the organ and measure its sound. See `tests/README.md`. |
 | `tests/unit/` | Unit tests for `js/core` (`npm run test:unit`, no browser). |
 | `scripts/check.mjs` | Static checks: page shape, referenced files, module syntax, imports resolve to real exports, element ids, allowed external hosts. |
@@ -99,7 +99,7 @@ physics is simulated:
 1. Step both treadle ADSR envelopes (`stepEnvelope`).
 2. Reservoir: `pressure += (inflow − drain) · dt / reservoirSize`. Inflow comes from the treadles (alternating feet fill better) and the helper pump. Drain grows with sounding reeds and the knee swell. Pressure is clamped to 0–1, and the relief valve vents at 1.
 3. Smooth the knee swell (`swellPos`) and the tone pressure (`tonePress`, Response time).
-4. `applyWind()` pushes targets into the audio graph: wind gain (`windLevel`, with a knee at 2″), lid/tilt filter (depending on the tone model), `windPitch` offset (Pitch drift), breath noise level.
+4. `applyWind()` pushes targets into the audio graph: wind gain (`windLevel`, with a knee at 2″), lid/tilt filter (depending on the tone model), `windPitch` offset (`windCents`: flat as the wind rises, D12), breath noise level.
 5. Update the gauge, treadle visuals and readouts (readouts at 10 Hz).
 
 Pressure is 0–1; the gauge shows `pressure × 3.6″`. The reference pressure `P_REF = 0.55` (about 2″) is where reeds are "in tune" and where tone and pitch offsets are zero.
@@ -111,10 +111,13 @@ the stop is off. Stops only change bus gains, so a stop drawn mid-chord comes in
 immediately. Each oscillator gets:
 
 - frequency `f × rank.mult`, using the rank's own `PeriodicWave` (`rankWave(i)`);
-- `detune` = `rankCents(i, f, m)` (Celeste beat or rank det, plus voicing tune, plus `reedError`), with a pitch scoop from below;
-- its own wind-response gain from `windPitch` (`reedWindResponse`);
+- `detune` from `keyTuning(f, m, half)`: each rank's `rankCents(i, f, m)` (Celeste beat or rank det, plus voicing tune, plus `reedError`), with drawn non-Celeste ranks inside the Unison pull range locked to their average (`lockReeds`, D14); the note starts Speech glide cents sharp and settles (D13);
+- its own wind-response gain from `windPitch` (`reedWindResponse`, averaged across a locked group);
+- a start time offset by part of its own cycle, so it starts at its own phase (locked reeds nearly together, D14);
 - an envelope gain whose attack slows with low wind (Speech speed);
 - routing to `buses[halfOf(m)][i]`.
+
+`retune()` recomputes `keyTuning` for every sounding voice and updates all ranks' detune and wind gains; it runs on tuning, Celeste, scatter, Unison pull, Drift variation and new-reed changes, and from `applyStops()`, because drawing a stop can lock or unlock reeds. `rewind` is the same function.
 
 Voices are reference-counted (`refs`). Input never calls `noteOn` directly: it
 calls `press(m)` / `release(m)`, which add coupled octaves. `recouple()` updates
@@ -134,10 +137,11 @@ held keys when a coupler is drawn or retired.
 | Ranks and waveforms | `core/ranks.js`, `audio.js` | `RANKS`, `WAVE_SPECS`, `waveRecipe`, `rankWave`, `loudnessComp`, `updateComp` |
 | Rank voicing drawer | `controls.js`, `audio.js` | `ctl.voicing`, `rankLevel`, `rankCents`, `retune`, `revoice` |
 | Individual reeds | `core/reeds.js`, `audio.js`, `controls.js` | `reedRand`, `reedTri`, `reedError`, `reedWindResponse`, `rewind`, `S.reedSeed` |
+| Unison pull and start phase | `core/reeds.js`, `audio.js`, `controls.js` | `lockReeds`, `keyTuning`, `retune`, `ctl.pull` |
 | Celeste | `core/ranks.js` | `celesteCents`, `ctl.beat` |
 | Divided stops | `core/ranks.js`, `stops.js`, `state.js` | `SPLITS`, `S.splitMode`, `halfOf`, `renderStops` |
 | Couplers | `keys.js` | `press`, `release`, `recouple`, `couplesFor` |
-| Wind and treadles | `wind-loop.js`, `treadles.js`, `core/wind.js` | `frame`, `ped`, `stepEnvelope`, `gateOn`, `gateOff`, `windLevel`, `windBright`, `KNEE` |
+| Wind and treadles | `wind-loop.js`, `treadles.js`, `core/wind.js` | `frame`, `ped`, `stepEnvelope`, `gateOn`, `gateOff`, `windLevel`, `windBright`, `windCents`, `KNEE` |
 | Wind tone | `audio.js`, `controls.js` | `applyWind`, `S.toneModel`, `TONE_MODELS`, `tilt`, `swell`, `S.tonePress` |
 | Vox Humana | `audio.js`, `core/fan.js`, `controls.js` | `applyVox`, `setFanShape`, `fanWaveCoefficients`, `lfoFreq`, `fanLow`, `shadow`, `refl`, `hiPan` |
 | Case and room | `audio.js` | `cabinetIR`, `impulse`, `applyMix`, `mix` |
