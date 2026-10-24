@@ -155,3 +155,42 @@ test("Unison pull holds Diapason and Melodia in step; Off lets them beat (D14)",
   expect(locked.overall).toBeLessThan(1);
   expect(free.overall).toBeGreaterThan(3);
 });
+
+// Samples level and spectral centroid every few ms from just before a key goes
+// down, and returns them with times relative to the first sound.
+async function onset(page, key, ms = 500) {
+  await page.evaluate(() => { window.__on = []; window.__oi = setInterval(() => window.__on.push([performance.now(), window.__rms(), window.__centroid()]), 4); });
+  await page.waitForTimeout(80);
+  await hold(page, key);
+  await page.waitForTimeout(ms);
+  const f = await page.evaluate(() => { clearInterval(window.__oi); return window.__on; });
+  await letGo(page, key);
+  await page.waitForTimeout(600);
+  const final = f.slice(-20).reduce((s, x) => s + x[1], 0) / 20;
+  const start = f.findIndex((x) => x[1] > final * 0.02);
+  return f.slice(start).map(([t, r, c]) => ({ t: t - f[start][0], r: r / final, c }));
+}
+const timeTo = (fr, level) => fr.find((x) => x.r >= level).t;
+
+test("low reeds speak more slowly than high ones (D16)", async ({ page }) => {
+  await openOrgan(page);
+  await toggleStop(page, "Melodia 8′");          // Diapason alone
+  await page.waitForTimeout(1500);               // let the reservoir fill
+  const low = await onset(page, "z", 700), high = await onset(page, "i", 700);   // C3, C5
+  const lowT = timeTo(low, 0.9), highT = timeTo(high, 0.9);
+  expect(lowT).toBeGreaterThan(highT * 1.8);
+});
+
+test("notes start dark and brighten as the reed speaks; Tone bloom Off doesn't (D17)", async ({ page }) => {
+  await openOrgan(page);
+  await toggleStop(page, "Melodia 8′");
+  await page.waitForTimeout(1500);
+  const early = (fr) => fr.filter((x) => x.r >= 0.15 && x.r <= 0.5).map((x) => x.c);
+  const steady = (fr) => fr.slice(-20).reduce((s, x) => s + x.c, 0) / 20;
+  const mean = (a) => a.reduce((s, x) => s + x, 0) / a.length;
+  const bloom = await onset(page, "z", 700);
+  await setSlider(page, "bloomAmt", 0);
+  const flat = await onset(page, "z", 700);
+  expect(mean(early(bloom))).toBeLessThan(steady(bloom) * 0.85);
+  expect(mean(early(flat))).toBeGreaterThan(steady(flat) * 0.9);
+});

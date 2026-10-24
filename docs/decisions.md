@@ -45,6 +45,7 @@ These come from the owner's own feedback and apply to every change:
 
 **Chosen:** default tone model `tilt`. The lid lowpass stays still (only the knee swell moves it), and a high shelf at 1.2 kHz, whose gain follows a smoothed wind pressure (Response, default 250 ms), tilts the harmonics. The original moving lowpass is kept as `sweep`. Depth 100% with a 20 ms response reproduces it.
 **Why:** the owner heard a "wah". The sweep moved a lowpass edge from 3.4 kHz down to 450 Hz, below most notes' second harmonic. A real free reed's spectrum only tilts with pressure. Measured on a draining held A4: the sweep lost 42% of its spectral centroid, mostly below 1.5″, while the tilt at 60% loses about half that, spread evenly. Ripple from steady pumping was only about 1% in every model, so big pressure swings were the cause. (PR #5)
+**Since D17:** the tilt is applied by a shelf on each reed at 1.5 × its own pitch rather than one shelf at 1.2 kHz, so it shifts every note's harmonics against its own fundamental.
 
 ## D7. Each reed has its own tuning error and wind response
 
@@ -97,3 +98,23 @@ These come from the owner's own feedback and apply to every change:
 **Test change:** the Sub octave test now measures below 160 Hz (the coupled A2's fundamental) rather than below 400 Hz. With independent start phases the A2's 2nd harmonic can add to or partly cancel A3's fundamental, so the old 400 Hz measurement varied from about 1 to 4.5 dB; it had only passed reliably because both notes used to start perfectly aligned. Below 160 Hz the coupler adds about 23.6 dB.
 **Guidance:** reeds on different keys still drift independently with the wind, so chords stay alive (D7). Unison pull at 0 restores free beating; Reed scatter above the pull range unlocks reeds naturally.
 **Revisit if:** the owner wants some unison beating back, or the lock should depend on frequency in Hz rather than cents.
+
+## D15. Melodia and Bourdon keep a reed's harmonics
+
+**Chosen:** the Melodia's recipe is now even harmonics 0.4 of odd, rolloff 1/k^1.25, 24 harmonics (was 0.3, 1/k^1.9, 16). The Bourdon has its own `bass` recipe: 0.5, 1/k^1.1, 40 harmonics. Rank levels moved (Melodia 0.9 → 0.868, Bourdon 0.85 → 0.914) so each rank's loudness is unchanged.
+**Why:** both ranks were almost pure sine waves, 97% of their power in the fundamental, which sounds like a flute or an electronic organ. A free reed always produces a harmonic-rich pulse; mellow reed stops get their softness from voicing and the reed cell, which round off the top but keep clear low harmonics. The Bourdon's big bass reeds are, if anything, buzzier.
+**Measured** (each rank alone on A3, helper 100%): Melodia h2/h3 −17/−13 dB against the fundamental (before −24/−21); Bourdon −10/−8 dB (before −20/−17). Loudness against the Diapason: Melodia +4.6 dB (before +4.8), Bourdon +2.5 dB (before +2.2); the other ranks unchanged.
+**Revisit if:** the owner wants a softer Melodia. Its Brightness slider in Rank voicing (level-matched, D4) can take it back towards the old tone.
+
+## D16. Reeds speak S-shaped, low reeds slower
+
+**Chosen:** each reed's onset is the product of two equal exponential rises, (1 − e^(−t/τ))², which starts with zero slope. Its 10–90% rise time is `speechTime(fr, p, speech)`: a fixed 20 ms plus about 14 cycles of the reed's own frequency, kept between 25 and 200 ms, scaled by the same wind factor as before (slower at low wind) and by Speech speed. An A3 reed at the reference wind takes about 84 ms, close to the old single time constant.
+**Why:** the onset used one exponential approach for every note, so it started at full speed and took the same time from the bottom of the keyboard to the top. A free reed's swing grows from almost nothing, slowly and then quickly, until it saturates (free-reed simulations and measurements show exactly this exponential growth to a limit, [Forum Acusticum 2023](https://dael.euracoustics.org/confs/fa2023/data/articles/000853.pdf)). Big low reeds take roughly a fixed number of cycles to build up, so they speak noticeably more slowly.
+**Measured** (Diapason alone, helper 100%, 10–90% rise): C2 162 ms, A3 61 ms, A5 25 ms, C7 19 ms; before, about 53 ms on every note. Level 10 ms after the start: C2 6%, A3 13%, A5 45%, C7 61% (before about 33% on A3 and above).
+
+## D17. Brightness follows each reed's swing, and the wind tilts each reed's own harmonics
+
+**Chosen:** every reed has its own high-shelf filter at 1.5 × its frequency, between its fundamental and 2nd harmonic. The shelf's gain starts Tone bloom dB down (new slider, default 18 dB) and opens to 0 a little behind the amplitude (time constant 1.3 × the onset's). The wind's tilt (Natural tilt, D6) now feeds the same shelves through one shared source (`tiltDb`) instead of a single high shelf at 1.2 kHz after the rank buses, which is removed. The tilt in dB is unchanged.
+**Why:** a reed swinging gently moves almost sinusoidally; the upper harmonics appear as the swing grows ([Forum Acusticum 2023](https://dael.euracoustics.org/confs/fa2023/data/articles/000853.pdf)). Notes used to start at full colour. And a shelf at a fixed 1.2 kHz didn't tilt each note's harmonics against its fundamental, as D6 intended: for low notes it only reached the 6th harmonic and up, and for treble notes it moved the fundamental itself, so the wind changed their loudness rather than their tone.
+**Measured** (Diapason alone, helper 100%): h2–h4 against the fundamental in 25 ms steps from the start of A3: −17.6, −11.7, −8.6, −7.1, −6.6 dB, settling at −6.2 dB (before flat at about −7 dB). Wind tone Depth 0 → 150 at full wind: A3 fundamental +0.6 dB and h2–h4 +3.0 dB (before 0.0 and +0.3 dB: the tilt barely touched A3's low harmonics); C6 fundamental +0.6 dB (before +1.2 dB). On a draining A4 at the default Depth, the spectral centroid falls 12% from 2.9″ to 1.3″ (before 10%). At the reference wind the tilt is 0 dB, so the settled tone there is as before; at full wind, low and middle notes are slightly brighter than before because the tilt now reaches their low harmonics.
+**Revisit if:** the owner finds the onset darkening too obvious (lower Tone bloom) or the full-wind brightness too strong (lower Wind tone Depth).

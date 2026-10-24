@@ -60,6 +60,7 @@ export function setupControls() {
 
   /* ---- reeds ---- */
   ctl.speech = bindSlider('speechAmt', 'speech', 33, fmtX, null, logMap(.5, 4));
+  ctl.bloom = bindSlider('bloomAmt', 'bloom', 18, v => v === 0 ? 'Off' : v + ' dB');
   ctl.scoop = bindSlider('scoopAmt', 'scoop', 5, v => v === 0 ? 'None' : v + ' ¢');
   ctl.scatter = bindSlider('scatterAmt', 'reedScatter', 1, v => v === 0 ? 'Perfect' : '±' + v.toFixed(1) + ' ¢', () => retune());
   $('newReeds').addEventListener('click', () => {

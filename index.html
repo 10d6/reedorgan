@@ -183,7 +183,12 @@
         <div class="field">
           <div class="field-head"><label for="speechAmt">Speech speed</label><output id="speechOut" for="speechAmt">1.0×</output></div>
           <input type="range" id="speechAmt" min="0" max="100" step="1" value="33">
-          <p class="sub">How slowly each note blooms in. Higher is slower.</p>
+          <p class="sub">How slowly each note blooms in. Higher is slower. Low reeds always take longer to get going than high ones, and low wind slows them all.</p>
+        </div>
+        <div class="field">
+          <div class="field-head"><label for="bloomAmt">Tone bloom</label><output id="bloomOut" for="bloomAmt">18 dB</output></div>
+          <input type="range" id="bloomAmt" min="0" max="30" step="1" value="18">
+          <p class="sub">How dark each note starts. A reed swinging gently is almost a pure tone; its buzz fills in as the swing grows. Off starts every note at full colour.</p>
         </div>
         <div class="field">
           <div class="field-head"><label for="scoopAmt">Speech glide</label><output id="scoopOut" for="scoopAmt">5 ¢</output></div>
@@ -248,6 +253,7 @@
   <div><h3>Melody and accompaniment</h3><p>Divide the stops, then draw soft Melodia in the bass and Diapason with Celeste in the treble. The tune sings out over a quiet accompaniment.</p></div>
   <div><h3>Swell and fan</h3><p>Vox Humana spins a little fan in front of the reeds. The fundamentals hold steady while the upper harmonics flicker and swirl. Try the Spinning fan shape with some Stereo sweep, and listen to it coast down when you push the stop in. The knee swell opens the lid gradually: louder and brighter, but it drinks wind faster.</p></div>
   <div><h3>Living tuning</h3><p>Hold a chord with Diapason and Melodia and pump unevenly. Each key drifts at its own pace, so the intervals between keys never settle into one pattern. Fit a new set of reeds to hear a different instrument.</p></div>
+  <div><h3>How a reed speaks</h3><p>Play a low C, then a high one, slowly. The low reed takes a moment to get going and starts almost as a pure hum before its buzz fills in; the high one speaks at once. Low wind makes every reed slower. Tone bloom sets how dark notes start.</p></div>
   <div><h3>Reeds in step</h3><p>Hold one note with Diapason and Melodia. The two ranks pull together and sound as one steady tone. Set Unison pull to Off and the same note swells and fades slowly as the two reeds drift past each other.</p></div>
   <div><h3>Couplers</h3><p>Draw Sub Octave and hold a chord: the keys an octave down sink with yours, and the bass grows heavy. Every coupled note is another set of reeds drinking wind.</p></div>
   <div><h3>Voice your own organ</h3><p>Open Rank voicing under Adjustments. Darken the Diapason, brighten the Principal, or detune a rank a few cents to hear how much a regulator's touch changes the instrument.</p></div>

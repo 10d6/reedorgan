@@ -19,7 +19,13 @@ changes the organ's loudness, brightness, pitch and how quickly notes speak.
 ## What's in it
 
 - **Five ranks of free reeds**: Bourdon 16′, Diapason 8′, Melodia 8′, Celeste 8′
-  and Principal 4′. The Celeste is tuned to beat at the same rate on every note.
+  and Principal 4′. Even the mellow Melodia and the deep Bourdon keep a reed's
+  buzz in their 2nd and 3rd harmonics. The Celeste is tuned to beat at the same
+  rate on every note.
+- **Reeds that speak**: each note's onset swells in S-shaped, the way a reed's
+  swing grows. Low reeds take longer to get going than high ones (about 160 ms
+  at the bottom, 20 ms at the top), and low wind slows them all. Each note
+  starts nearly a pure tone and its buzz fills in as it speaks (*Tone bloom*).
 - **Divided stops**: optionally split every rank into bass and treble halves, at
   E | F below middle C (the traditional American split) or at middle C.
 - **Octave couplers**: Sub Octave and Super Octave pull down the keys an octave
@@ -55,7 +61,7 @@ changes the organ's loudness, brightness, pitch and how quickly notes speak.
   Celeste never locks. Each reed also starts at its own point in its swing.
 - **Wind tone**: how the wind colours the sound. *Natural tilt* (the default)
   shifts the balance of upper harmonics against the fundamental, as a real reed
-  does; *Filter sweep* is the original moving lowpass. Depth, resonance (Q) and
+  does, measured from each reed's own pitch so it works the same on every note; *Filter sweep* is the original moving lowpass. Depth, resonance (Q) and
   response time are adjustable.
 - **Rank voicing**: a drawer under Adjustments with level, fine tuning (±20
   cents) and brightness for each rank, plus a button to restore the factory

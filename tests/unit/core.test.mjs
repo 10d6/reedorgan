@@ -2,7 +2,8 @@
 // No browser needed; each test pins down a property from docs/decisions.md.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { RANKS, CELESTE, SPLITS, noteFreq, waveRecipe, scaledRms, loudnessComp, celesteCents } from "../../js/core/ranks.js";
+import { RANKS, CELESTE, SPLITS, noteFreq, waveRecipe, scaledRms, loudnessComp, celesteCents, WAVE_SPECS, WAVE_SPECS_V1 } from "../../js/core/ranks.js";
+import { windSpeech, speechTime, onsetTau, onsetShape, RISE_PER_TAU, TILT_RATIO } from "../../js/core/speech.js";
 import { reedRand, reedTri, reedError, reedWindResponse, lockReeds } from "../../js/core/reeds.js";
 import { windLevel, windBright, windCents, KNEE, P_REF, gaugeInches, toTime, toSlider, fmtT, stepEnvelope, DEFAULT_ENV } from "../../js/core/wind.js";
 import { fanWaveCoefficients } from "../../js/core/fan.js";
@@ -145,4 +146,37 @@ test("D14: at default scatter (±1 ¢) and pull (3 ¢), every key's unison ranks
     const cents = [0, 1, 2, 4].map((i) => reedError(seed, i, m, 1));
     assert.ok(lockReeds(cents, [1, 1, 1, 1], [true, true, true, true], 3).locked.every(Boolean), `seed ${seed} key ${m}`);
   }
+});
+
+const fundShare = (sp) => { let t = 0; for (let k = 1; k <= sp.n; k++) t += ((k % 2 ? 1 : sp.even) / k ** sp.exp) ** 2; return 1 / t; };
+const recipe = (sp) => ({ amp: (k) => (k % 2 ? 1 : sp.even) / k ** sp.exp, n: sp.n });
+
+test("D15: Melodia and Bourdon keep clear harmonics, at the same loudness as before", () => {
+  assert.ok(fundShare(WAVE_SPECS.mellow) < 0.92, "Melodia is no longer almost a pure tone");
+  assert.ok(fundShare(WAVE_SPECS.bass) < fundShare(WAVE_SPECS.mellow), "the Bourdon is buzzier than the Melodia");
+  assert.ok(fundShare(WAVE_SPECS_V1.mellow) > 0.95, "the old recipe was nearly a sine");
+  const old = scaledRms(recipe(WAVE_SPECS_V1.mellow));
+  for (const [id, oldLevel] of [["melodia", 0.9], ["bourdon", 0.85]]) {
+    const r = RANKS.find((x) => x.id === id);
+    near(20 * Math.log10(r.level * scaledRms(waveRecipe(r, 0)) / (oldLevel * old)), 0, 0.1, id + " loudness (dB)");
+  }
+});
+
+test("D16: speech time is S-shaped, slower for low reeds and low wind", () => {
+  near(windSpeech(P_REF), 1, 1e-12);
+  assert.ok(windSpeech(1) < windSpeech(P_REF) && windSpeech(0.1) > windSpeech(P_REF));
+  near(speechTime(220, P_REF, 1), 0.0836, 0.001, "A3 at the reference wind");
+  assert.ok(speechTime(65, P_REF, 1) > 2 * speechTime(262, P_REF, 1), "C2 slower than C4");
+  near(speechTime(20, P_REF, 1), 0.2, 1e-12, "slowest");
+  near(speechTime(5000, P_REF, 1), 0.025, 1e-12, "fastest");
+  near(speechTime(220, P_REF, 2), 2 * speechTime(220, P_REF, 1), 1e-12, "Speech speed scales it");
+  // zero slope at the start, and the 10–90% rise matches RISE_PER_TAU
+  const tau = onsetTau(0.1);
+  assert.ok(onsetShape(tau * 0.01, tau) < 0.001, "starts almost flat");
+  const cross = (y) => { let t = 0; while (onsetShape(t, tau) < y) t += tau / 10000; return t; };
+  near((cross(0.9) - cross(0.1)) / tau, RISE_PER_TAU, 0.01);
+});
+
+test("D17: each reed's tone shelf sits between its fundamental and 2nd harmonic", () => {
+  assert.ok(TILT_RATIO > 1 && TILT_RATIO < 2);
 });

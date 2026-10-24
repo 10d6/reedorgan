@@ -17,7 +17,7 @@ exists. For *why* things are built this way, see [decisions.md](decisions.md).
 | `js/stops.js` | Stop rail and the divided-stops selector. |
 | `js/treadles.js` | The two treadles: ADSR state (`ped`), pedals, envelope pictures, `gateOn`/`gateOff`. |
 | `js/wind-loop.js` | The per-frame control loop (`frame`), the gauge and readouts. |
-| `js/core/*.js` | Pure maths, with no page or audio access: `ranks.js` (ranks, waveforms, brightness compensation, Celeste), `reeds.js` (per-reed scatter, wind response and Unison pull), `wind.js` (loudness, brightness and pitch against pressure, treadle envelopes), `fan.js` (the spinning-fan wave). |
+| `js/core/*.js` | Pure maths, with no page or audio access: `ranks.js` (ranks, harmonic recipes, brightness compensation, Celeste), `reeds.js` (per-reed scatter, wind response and Unison pull), `wind.js` (loudness, brightness and pitch against pressure, treadle envelopes), `speech.js` (how a reed speaks: onset time and shape, tone bloom, the tone shelf's position), `fan.js` (the spinning-fan wave). |
 | `tests/*.spec.js` | Playwright tests that play the organ and measure its sound. See `tests/README.md`. |
 | `tests/unit/` | Unit tests for `js/core` (`npm run test:unit`, no browser). |
 | `scripts/check.mjs` | Static checks: page shape, referenced files, module syntax, imports resolve to real exports, element ids, allowed external hosts. |
@@ -68,11 +68,12 @@ browsers only allow sound after the player interacts.
 ```mermaid
 flowchart LR
   subgraph Voice["Per key (voice)"]
-    O1["5 oscillators<br/>one per rank"] --> E1["envelope gains"]
+    O1["5 oscillators<br/>one per rank"] --> SH["tone shelf per reed<br/>at 1.5 × its pitch"] --> E1["envelope gains<br/>g × on"]
+    TD["tiltDb<br/>(wind tone, dB)"] --> SH
     WP["windPitch<br/>(cents)"] --> WR["per-reed gain<br/>v.winds[i]"] --> O1
   end
   E1 --> B["rank buses<br/>buses.bass[i] / buses.treble[i]"]
-  B --> SW["swell lowpass<br/>(lid / sweep)"] --> TL["tilt high-shelf"] --> WG["wind gain"] --> TR["trem gain"]
+  B --> SW["swell lowpass<br/>(lid / sweep)"] --> WG["wind gain"] --> TR["trem gain"]
   N["breath noise"] --> TR
   TR --> FIN
   subgraph FAN["Fan stage (Vox Humana)"]
@@ -90,6 +91,7 @@ Modulators (all audio-rate `AudioParam` connections):
 - `lfo` (Vox Humana blade wave: sine, or a two-blade Fourier wave) → `lfoShadow` → `shadow.gain`; → `lfoAmp` → `trem.gain` (Whole-sound wobble); → `lfoFilt` → `swell.detune` (Lid wobble).
 - `lfoPan` (cosine, started at the same instant as `lfo` so they stay phase-locked) → `lfoRefl` → `refl.delayTime`; → `lfoPanAmt` → `hiPan.pan`.
 - `windPitch` (a `ConstantSource`, in cents) → each reed's own gain → that oscillator's `detune`.
+- `tiltDb` (a `ConstantSource`, in dB) → every reed's tone shelf `gain`, added to the shelf's own onset automation (Tone bloom).
 
 ## Control loop
 
@@ -99,7 +101,7 @@ physics is simulated:
 1. Step both treadle ADSR envelopes (`stepEnvelope`).
 2. Reservoir: `pressure += (inflow − drain) · dt / reservoirSize`. Inflow comes from the treadles (alternating feet fill better) and the helper pump. Drain grows with sounding reeds and the knee swell. Pressure is clamped to 0–1, and the relief valve vents at 1.
 3. Smooth the knee swell (`swellPos`) and the tone pressure (`tonePress`, Response time).
-4. `applyWind()` pushes targets into the audio graph: wind gain (`windLevel`, with a knee at 2″), lid/tilt filter (depending on the tone model), `windPitch` offset (`windCents`: flat as the wind rises, D12), breath noise level.
+4. `applyWind()` pushes targets into the audio graph: wind gain (`windLevel`, with a knee at 2″), lid filter and `tiltDb` (depending on the tone model; each reed's own shelf applies the tilt, D17), `windPitch` offset (`windCents`: flat as the wind rises, D12), breath noise level.
 5. Update the gauge, treadle visuals and readouts (readouts at 10 Hz).
 
 Pressure is 0–1; the gauge shows `pressure × 3.6″`. The reference pressure `P_REF = 0.55` (about 2″) is where reeds are "in tune" and where tone and pitch offsets are zero.
@@ -114,7 +116,8 @@ immediately. Each oscillator gets:
 - `detune` from `keyTuning(f, m, half)`: each rank's `rankCents(i, f, m)` (Celeste beat or rank det, plus voicing tune, plus `reedError`), with drawn non-Celeste ranks inside the Unison pull range locked to their average (`lockReeds`, D14); the note starts Speech glide cents sharp and settles (D13);
 - its own wind-response gain from `windPitch` (`reedWindResponse`, averaged across a locked group);
 - a start time offset by part of its own cycle, so it starts at its own phase (locked reeds nearly together, D14);
-- an envelope gain whose attack slows with low wind (Speech speed);
+- a high-shelf tone filter at 1.5 × its own frequency (`TILT_RATIO`). Its gain starts Tone bloom dB down and opens as the reed speaks, `BLOOM_LAG` × slower than the amplitude; `tiltDb` adds the wind's tilt (D17);
+- two envelope gains, `g` (which also carries the release) and `on`, each rising with the same time constant, so the onset is (1 − e^(−t/τ))²: S-shaped, slower for lower reeds and lower wind (`speechTime`, `onsetTau` in `core/speech.js`, D16);
 - routing to `buses[halfOf(m)][i]`.
 
 `retune()` recomputes `keyTuning` for every sounding voice and updates all ranks' detune and wind gains; it runs on tuning, Celeste, scatter, Unison pull, Drift variation and new-reed changes, and from `applyStops()`, because drawing a stop can lock or unlock reeds. `rewind` is the same function.
@@ -142,7 +145,8 @@ held keys when a coupler is drawn or retired.
 | Divided stops | `core/ranks.js`, `stops.js`, `state.js` | `SPLITS`, `S.splitMode`, `halfOf`, `renderStops` |
 | Couplers | `keys.js` | `press`, `release`, `recouple`, `couplesFor` |
 | Wind and treadles | `wind-loop.js`, `treadles.js`, `core/wind.js` | `frame`, `ped`, `stepEnvelope`, `gateOn`, `gateOff`, `windLevel`, `windBright`, `windCents`, `KNEE` |
-| Wind tone | `audio.js`, `controls.js` | `applyWind`, `S.toneModel`, `TONE_MODELS`, `tilt`, `swell`, `S.tonePress` |
+| Wind tone | `audio.js`, `controls.js`, `core/speech.js` | `applyWind`, `S.toneModel`, `TONE_MODELS`, `tiltDb`, `TILT_RATIO`, `swell`, `S.tonePress` |
+| Speech and Tone bloom | `core/speech.js`, `audio.js`, `controls.js` | `speechTime`, `windSpeech`, `onsetTau`, `BLOOM_LAG`, `ctl.speech`, `ctl.bloom` |
 | Vox Humana | `audio.js`, `core/fan.js`, `controls.js` | `applyVox`, `setFanShape`, `fanWaveCoefficients`, `lfoFreq`, `fanLow`, `shadow`, `refl`, `hiPan` |
 | Case and room | `audio.js` | `cabinetIR`, `impulse`, `applyMix`, `mix` |
 | MIDI | `keys.js` | `connectMidi`, `onMidi` (notes, CC64 sustain, CC11/CC4 swell, CC120/123) |
