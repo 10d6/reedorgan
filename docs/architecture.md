@@ -7,7 +7,7 @@ exists. For *why* things are built this way, see [decisions.md](decisions.md).
 
 | Path | What it is |
 | --- | --- |
-| `index.html` | The markup: cabinet with a top bar (name, gauge, Volume/MIDI/All notes off), stop rail with Rank voicing and the Vox Humana fan, Knee swell, keyboard, treadle area, Adjustments, notes. Loads `css/organ.css` and `js/main.js`. |
+| `index.html` | The markup: cabinet with a top bar (name, gauge, Volume/MIDI/All notes off), stop rail with the Rank voicing and Vox Humana fan drawers, the wind status line under the gauge, Knee swell, keyboard, treadle area, Adjustments, notes. Loads `css/organ.css` and `js/main.js`. |
 | `css/organ.css` | All styles. Colour tokens are in the `:root` block at the top. |
 | `js/main.js` | Entry point: calls each module's setup in order (see below). |
 | `js/state.js` | Shared state: `S` (pressure, swell, tone and the saved choices), `stops`, `voices`, `store` (localStorage), `halfOf`. |

@@ -12,7 +12,7 @@ import { initAudio, applyStops, applyVox, applyMix, applyOutput, setFanShape, re
 // already mapped to what the sound uses (see bindSlider).
 export const ctl = {};
 // Cabinet, room and treadle-noise levels in percent.
-export const mix = { cab: store.get('cab', 45), room: store.get('room', 30), thump: store.get('thump', 60) };
+export const mix = { cab: store.get('cab', 45), room: store.get('room', 30), thump: store.get('thump', 30) };   // treadle noise 30% since D25
 
 /* Sliders that save themselves: fmt turns the slider value into its readout,
    map turns it into the value the sound uses. The input id ends in Amt and its
@@ -107,6 +107,10 @@ export function setupControls() {
   const voicingEl = $('voicing');
   voicingEl.open = store.get('voicingOpen', false);
   voicingEl.addEventListener('toggle', () => store.set('voicingOpen', voicingEl.open));
+  // The Vox Humana fan's controls fold away like the voicing (D25); drawing the stop opens them.
+  const voxPanel = $('voxPanel');
+  voxPanel.open = store.get('voxOpen', false);
+  voxPanel.addEventListener('toggle', () => store.set('voxOpen', voxPanel.open));
   RANKS.forEach((_, i) => updateComp(i));
 
   /* ---- cabinet, room and treadle noise ---- */
@@ -121,7 +125,7 @@ export function setupControls() {
 
   /* ---- Vox Humana fan ---- */
   const voxEl = $('voxRate'), voxOut = $('voxOut');
-  voxEl.value = store.get('voxRate', 5.6);
+  voxEl.value = store.get('voxRate', 9);   // D25 defaults: 9 Hz, shadow 50%, shimmer 10%
   const syncVox = () => { voxOut.textContent = (+voxEl.value).toFixed(1) + ' Hz'; };
   voxEl.addEventListener('input', () => { initAudio(); syncVox(); store.set('voxRate', +voxEl.value); applyVox(); });
   syncVox();
@@ -134,8 +138,8 @@ export function setupControls() {
   });
   // bigger blades reach further down the spectrum: 4 kHz (small) to 600 Hz (large)
   ctl.voxBlade = bindSlider('voxBladeAmt', 'voxBlade', 52, (_, f) => 'above ' + fmtHz(f), () => applyVox(), logMap(4000, 600));
-  ctl.voxShadow = bindSlider('voxShadowAmt', 'voxShadow', 35, v => v === 0 ? 'None' : v + '%', () => applyVox(), v => v / 100);
-  ctl.voxShim = bindSlider('voxShimmerAmt', 'voxShimmer', 30, v => v === 0 ? 'None' : v + '%', () => applyVox(), v => v / 100);
+  ctl.voxShadow = bindSlider('voxShadowAmt', 'voxShadow', 50, v => v === 0 ? 'None' : v + '%', () => applyVox(), v => v / 100);
+  ctl.voxShim = bindSlider('voxShimmerAmt', 'voxShimmer', 10, v => v === 0 ? 'None' : v + '%', () => applyVox(), v => v / 100);
   ctl.voxStereo = bindSlider('voxStereoAmt', 'voxStereo', 0, v => v === 0 ? 'Off' : v + '%', () => applyVox(), v => v / 100);
   ctl.voxWhole = bindSlider('voxWholeAmt', 'voxWhole', 0, v => v === 0 ? 'Off' : v + '%', () => applyVox(), v => v / 100);
   ctl.voxLid = bindSlider('voxLidAmt', 'voxLid', 0, v => v === 0 ? 'Off' : v + '%', () => applyVox(), v => v * 4);   // 100% = ±400 cents on the lid filter

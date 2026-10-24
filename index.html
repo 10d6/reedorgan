@@ -16,9 +16,10 @@
     <div class="nameboard">
       <svg class="fret" viewBox="0 0 320 10" aria-hidden="true"><path d="M0 5 H130 M190 5 H320" stroke="#c9a052" stroke-width="1"/><path d="M140 5 l10 -4 l10 4 l10 -4 l10 4 l-10 4 l-10 -4 l-10 4 z" fill="none" stroke="#c9a052" stroke-width="1"/></svg>
       <h1 class="plate">Parlor Reed Organ</h1>
-      <p class="subplate">Five sets of free reeds · foot-pumped wind · fan tremolo</p>
+      <p class="subplate">Five sets of free reeds · foot‑pumped wind · fan tremolo</p>
     </div>
     <div class="gauge-wrap">
+      <div class="gauge-col">
       <svg class="gauge" id="gauge" viewBox="0 0 200 122" role="img" aria-label="Wind pressure gauge">
         <defs>
           <radialGradient id="dial" cx="50%" cy="85%" r="85%"><stop offset="0" stop-color="#f3e8cc"/><stop offset="1" stop-color="#cdbb92"/></radialGradient>
@@ -30,12 +31,13 @@
         <line id="needle" x1="100" y1="112" x2="100" y2="34" stroke="#2a1a10" stroke-width="2.5" stroke-linecap="round"/>
         <circle cx="100" cy="112" r="7" fill="#c9a052" stroke="#2a1a10" stroke-width="1.5"/>
       </svg>
+      <span class="status ok" id="status" role="status">Press a key to start</span>
+      </div>
       <div class="readouts" aria-live="off">
         <span>Wind</span><b id="rWind">2.0″</b>
         <span>Pitch</span><b id="rPitch">0 ¢</b>
         <span>Reeds</span><b id="rReeds">0</b>
         <span>Use</span><b id="rUse">0.02/s</b>
-        <span class="status ok" id="status">Press a key to start</span>
       </div>
     </div>
     <div class="top-ctrls" data-info="top">
@@ -72,12 +74,13 @@
         <div><button class="btn" id="voicingReset" type="button">Restore factory voicing</button></div>
       </div>
     </details>
-    <div class="vox-panel" data-info="vox">
-      <p class="rail-label info-host">Vox Humana fan</p>
+    <details class="vox-panel" id="voxPanel" data-info="vox">
+      <summary class="info-host">Vox Humana fan</summary>
+      <div class="vox-body">
       <div class="vox-grid">
         <div class="field">
-          <div class="field-head"><label for="voxRate">Speed</label><output id="voxOut" for="voxRate">5.6 Hz</output></div>
-          <input type="range" id="voxRate" min="1" max="12" step="0.1" value="5.6">
+          <div class="field-head"><label for="voxRate">Speed</label><output id="voxOut" for="voxRate">9.0 Hz</output></div>
+          <input type="range" id="voxRate" min="1" max="12" step="0.1" value="9">
         </div>
         <div class="field">
           <label for="voxShape" class="field-label">Shape</label>
@@ -91,12 +94,12 @@
           <input type="range" id="voxBladeAmt" min="0" max="100" step="1" value="52">
         </div>
         <div class="field">
-          <div class="field-head"><label for="voxShadowAmt">Blade shadow</label><output id="voxShadowOut" for="voxShadowAmt">35%</output></div>
-          <input type="range" id="voxShadowAmt" min="0" max="100" step="1" value="35">
+          <div class="field-head"><label for="voxShadowAmt">Blade shadow</label><output id="voxShadowOut" for="voxShadowAmt">50%</output></div>
+          <input type="range" id="voxShadowAmt" min="0" max="100" step="1" value="50">
         </div>
         <div class="field">
-          <div class="field-head"><label for="voxShimmerAmt">Shimmer</label><output id="voxShimmerOut" for="voxShimmerAmt">30%</output></div>
-          <input type="range" id="voxShimmerAmt" min="0" max="100" step="1" value="30">
+          <div class="field-head"><label for="voxShimmerAmt">Shimmer</label><output id="voxShimmerOut" for="voxShimmerAmt">10%</output></div>
+          <input type="range" id="voxShimmerAmt" min="0" max="100" step="1" value="10">
         </div>
         <div class="field">
           <div class="field-head"><label for="voxStereoAmt">Stereo sweep</label><output id="voxStereoOut" for="voxStereoAmt">Off</output></div>
@@ -113,7 +116,8 @@
       </div>
       <p class="sub" id="voxSub"></p>
       <p class="sub">The fan stirs the sound after it leaves the reeds, so it only catches the upper harmonics: those above the blade-size frequency. Blade shadow is the flicker as blades pass; Shimmer is the phasing from sound bouncing off the moving blades; Stereo sweep moves those upper harmonics side to side. The fundamentals stay steady. Whole-sound wobble and Lid wobble are the earlier tremolo, which pulses everything; they're off by default.</p>
-    </div>
+      </div>
+    </details>
   </section>
 
   <section class="console" aria-label="Playing" data-info="play">
@@ -281,8 +285,8 @@
           <p class="sub">The hiss of air through the reed cells. It still follows the wind and how many notes are playing.</p>
         </div>
         <div class="field">
-          <div class="field-head"><label for="thumpAmt">Treadle noise</label><output id="thumpOut" for="thumpAmt">60%</output></div>
-          <input type="range" id="thumpAmt" min="0" max="100" step="1" value="60">
+          <div class="field-head"><label for="thumpAmt">Treadle noise</label><output id="thumpOut" for="thumpAmt">30%</output></div>
+          <input type="range" id="thumpAmt" min="0" max="100" step="1" value="30">
         </div>
       </div>
     </div>

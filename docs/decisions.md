@@ -164,3 +164,14 @@ These come from the owner's own feedback and apply to every change:
 **Chosen:** the instrument's name moves to the left of a top bar, with the wind gauge and its readouts beside it, and Volume, Connect MIDI (Rescan MIDI once connected) and All notes off on the right. The top bar wraps to two rows below 900 px (name on its own row) and to one column below 560 px. The Knee swell stays just above the keyboard. Rank voicing moves directly under the draw stops, above the Vox Humana fan; it stays collapsed by default and still remembers being opened. Every section with explanatory text gets a small brass "i" button beside its heading that shows or hides that section's `.sub` and `.hint` paragraphs (not those of a section nested inside it, which has its own button). Explanations start hidden, and each section's choice is saved (`reed-info-<key>`). The buttons are built by `setupInfo()` in `js/info.js` from `data-info="<key>"` on each section and `.info-host` on its heading.
 **Why:** the owner asked for this layout and for the explanations to be toggleable, so the instrument reads as an instrument first, with the help a tap away.
 **Revisit if:** first-time players miss the keyboard hint (computer keys, arrows, Esc), which is now behind the Knee swell's info button; it could start shown on a first visit.
+
+## D25. Status under the gauge, a folding Vox Humana panel, the MIDI prompt, new defaults
+
+**Chosen:**
+- The wind status line ("Relief valve venting", "Out of wind. Pump!", "Helper can't keep up; wind falling"…) moves from beside the readouts to directly under the gauge, in a box the gauge's width with room for two lines, so a longer message no longer changes the top bar's columns and moves the gauge.
+- The Vox Humana fan's controls fold away in a drawer like Rank voicing, closed by default and remembered (`reed-voxOpen`). Drawing the Vox Humana stop opens it; pushing the stop in leaves it as it is.
+- **Connect MIDI** has an orange outline and glow (class `attention`) until a MIDI input is listening, and again if every input disconnects.
+- New defaults from the owner: fan speed 9 Hz (was 5.6), Blade shadow 50% (was 35%), Shimmer 10% (was 30%), Treadle noise 30% (was 60%).
+**Why:** the owner saw the gauge jump when the status changed, and asked for the rest.
+**Measured** (D8 method: held A3, Diapason alone, fan spun up, three 2 s runs): old defaults bass 0.1 dB, overall 0.2 dB, treble flicker 6.0 dB; new defaults bass 0.0 dB, overall 0.1 dB, treble flicker 6.1 dB. The deeper blade shadow and the lower shimmer even out, so the flicker is as deep but faster. Treadle noise at 30% is 6 dB quieter.
+**Test changed:** the settings test now opens the Vox Humana panel before choosing the fan shape, as a player would, and checks the panel stays open after a reload.

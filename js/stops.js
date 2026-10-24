@@ -26,7 +26,10 @@ function renderStops() {
   stopsEl.innerHTML = '';
   const divided = S.splitMode !== 'none';
   stopsEl.classList.toggle('divided', divided);
-  const vox = knob('Vox Humana', 'tremolo', stops.vox, 'Vox Humana tremolo', () => (stops.vox = !stops.vox), true);
+  // Drawing the Vox Humana opens its controls; retiring it leaves them as they are (D25).
+  const vox = knob('Vox Humana', 'tremolo', stops.vox, 'Vox Humana tremolo', () => {
+    stops.vox = !stops.vox; if (stops.vox) document.getElementById('voxPanel').open = true; return stops.vox;
+  }, true);
   const sub = knob('Sub Octave', 'coupler', stops.sub, 'Sub octave coupler', () => { stops.sub = !stops.sub; recouple(); return stops.sub; }, true);
   const sup = knob('Super Octave', 'coupler', stops.sup, 'Super octave coupler', () => { stops.sup = !stops.sup; recouple(); return stops.sup; }, true);
   if (!divided) {
