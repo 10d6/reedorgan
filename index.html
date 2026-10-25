@@ -50,7 +50,7 @@
         <div class="field-head info-host"><label class="check" for="directOn"><input type="checkbox" id="directOn"> Direct wind</label><output id="airOut" for="airAmt">2.0″</output></div>
         <input type="range" id="airAmt" min="0" max="36" step="1" value="20" disabled>
         <div class="direct-midi"><span id="directCC">MIDI CC7 (volume knob)</span><button class="btn btn-small" id="directLearn" type="button">Learn</button></div>
-        <p class="sub">Set the air in the reservoir yourself. While this is on, the slider is the only thing that moves the wind: the treadles, autoplay and helper pump add none, and playing uses none. 2.0″ is normal wind. From a MIDI keyboard, the volume knob (CC7) or a breath controller (CC2) moves it; press Learn and turn any other knob to use that instead. With Direct wind off, the volume knob sets Volume.</p>
+        <p class="sub">Set the air in the reservoir yourself. While this is on, the slider is the only thing that moves the wind: the treadles, the sequencer's treadle patterns and the helper pump add none, and playing uses none. 2.0″ is normal wind. From a MIDI keyboard, the volume knob (CC7) or a breath controller (CC2) moves it; press Learn and turn any other knob to use that instead. With Direct wind off, the volume knob sets Volume.</p>
       </div>
       <div class="midi-row">
         <button class="btn" id="midiBtn" type="button">Connect MIDI</button>
@@ -210,34 +210,6 @@
       <p class="sub">Delay control: press Learn and move any knob, slider or pedal on a MIDI controller. All the way down is Never, all the way up is no delay, so pushing it brings the vibrato in sooner, even on a note you're already holding. A MIDI keyboard's mod wheel sets Scoop (unless you learn it for the delay), and its pitch wheel bends every sounding note by up to Bend range.</p>
       </div>
     </details>
-    <details class="vox-panel" id="seqPanel" data-info="seq">
-      <summary class="info-host">Modulation sequencer</summary>
-      <div class="vox-body">
-      <div class="seq-head">
-        <label class="check" for="seqOn"><input type="checkbox" id="seqOn"> Play the pattern</label>
-        <div class="field">
-          <label for="seqTarget" class="field-label">Moves</label>
-          <select id="seqTarget"><option value="direct">Direct wind</option><option value="fan">Vox Humana fan speed</option><option value="swell">Knee swell</option></select>
-        </div>
-        <div class="field">
-          <label for="seqTrigger" class="field-label">Starts on</label>
-          <select id="seqTrigger"><option value="first">First note</option><option value="each">Each note</option></select>
-        </div>
-        <div class="field">
-          <label for="seqBars" class="field-label">Length</label>
-          <select id="seqBars"><option value="1">1 bar</option><option value="2">2 bars</option></select>
-        </div>
-        <div class="field seq-amount">
-          <div class="field-head"><label for="seqAmountAmt">Amount</label><output id="seqAmountOut" for="seqAmountAmt">25% · 0.9″</output></div>
-          <input type="range" id="seqAmountAmt" min="0" max="100" step="1" value="25">
-        </div>
-        <button class="btn btn-small" id="seqClear" type="button">Clear pattern</button>
-      </div>
-      <div class="seq-roll"><div class="seq-grid" id="seqGrid" role="group" aria-label="Modulation pattern"></div></div>
-      <p class="sub">A piano roll of sweeps. Each row is a shape, rising or falling; tap a square to put that shape there, and drag either end of a note to stretch it backwards or forwards. Tap a note to select it: Backspace removes it, Shift with the arrow keys stretches it, Alt with the arrow keys shortens it. One shape plays at a time, so a new note replaces any note it lands on.</p>
-      <p class="sub">It moves one thing at a time: Direct wind (0″ to 3.6″), the Vox Humana fan's speed (1 to 12 Hz) or the knee swell (closed to open). Each note moves it by Amount, a share of that range, starting from wherever the last note left it, and it holds still between notes. A sweep that reaches either end of the range stops there. The pattern keeps time in 16th notes with Pedal autoplay's tempo. It starts on the first note of a phrase (or on each note), loops while you hold keys, starts each pass from the control's own setting, and lets it ease back to that setting when you let go; the slider itself doesn't move. Turning the sequencer on turns on what it moves: Direct wind, or the Vox Humana stop. The fan only turns while that stop is drawn.</p>
-      </div>
-    </details>
   </section>
 
   <section class="console" aria-label="Playing" data-info="play">
@@ -264,27 +236,39 @@
       </div>
     </div>
     <p class="sub" style="margin:0 0 14px"><strong>Easy wind</strong> charges the bellows for no more than three notes on a single stop, however much you play, so full chords and extra stops don't need harder pumping. The sound doesn't change. Each treadle feeds air through its own envelope. Pressing starts the attack; holding keeps the sustain flowing; letting go starts the release. Times run up to 30 seconds.</p>
-    <div class="rail autoplay" id="autoplay" data-info="autoplay">
-      <div class="auto-head">
-        <p class="rail-label info-host">Pedal autoplay</p>
-        <label class="check" for="autoOn"><input type="checkbox" id="autoOn" checked> Pump for me</label>
-      </div>
-      <div class="auto-ctrls">
+    <div class="rail seq" id="seq" data-info="seq">
+      <p class="rail-label info-host">Modulation sequencer</p>
+      <div class="seq-head">
         <div class="field">
           <div class="field-head"><label for="tempoAmt">Tempo</label><output id="tempoOut" for="tempoAmt">100 bpm</output></div>
           <input type="range" id="tempoAmt" min="30" max="200" step="1" value="100">
         </div>
         <div class="field">
-          <label for="meter" class="field-label">Time</label>
-          <select id="meter"></select>
+          <label for="seqMeter" class="field-label">Time</label>
+          <select id="seqMeter"></select>
         </div>
         <div class="field">
-          <label for="measures" class="field-label">Measures</label>
-          <select id="measures"></select>
+          <label for="seqBars" class="field-label">Length</label>
+          <select id="seqBars"></select>
+        </div>
+        <div class="field">
+          <label for="seqTrigger" class="field-label">Starts on</label>
+          <select id="seqTrigger"><option value="first">First note</option><option value="each">Each note</option></select>
         </div>
       </div>
-      <div class="auto-grid" id="autoGrid"></div>
-      <p class="sub">Tap a beat to change it: Rest, Left, Right, or Tie, which holds the stroke before it longer. The pattern loops, starting when you first play. Tempo counts quarter notes, or eighth notes in 6/8. Your own feet still work, and the helper pump adds a trickle on top.</p>
+      <div class="seq-tabs" id="seqLanes" role="tablist" aria-label="Patterns"></div>
+      <div class="seq-head seq-lane-head">
+        <label class="check" for="seqOn"><input type="checkbox" id="seqOn"> Play this pattern</label>
+        <div class="field seq-amount">
+          <div class="field-head"><label for="seqAmountAmt">Amount</label><output id="seqAmountOut" for="seqAmountAmt">100% of a stroke</output></div>
+          <input type="range" id="seqAmountAmt" min="0" max="100" step="1" value="100">
+        </div>
+        <button class="btn btn-small" id="seqClear" type="button">Clear pattern</button>
+      </div>
+      <div class="seq-roll"><div class="seq-grid" id="seqGrid" role="group" aria-label="Left treadle pattern"></div></div>
+      <p class="sub">One pattern for each thing it moves, all playing together: the left and right treadles, Direct wind (0″ to 3.6″), the Vox Humana fan's speed (1 to 12 Hz) and the knee swell (closed to open). Pick a pattern above to see and edit it; a lit lamp means it's playing. The treadle patterns pump the organ: they start with the first touch and keep going between phrases, a sweep up pressing the pedal and a sweep down letting it up. The others start on the first note of a phrase (or on each note) and loop while you hold keys.</p>
+      <p class="sub">A piano roll of sweeps in 16th notes. Each row is a shape, rising or falling; tap a square to put that shape there, and drag either end of a note to stretch it backwards or forwards. Tap a note to select it: Backspace removes it, Shift with the arrow keys stretches it, Alt with the arrow keys shortens it. One shape plays at a time in a pattern, so a new note replaces any note it lands on. Each note moves its control by that pattern's Amount, starting from wherever the last note left it, and it holds still between notes; a sweep that reaches either end of the range stops there. Every pass starts from the control's own setting, which the sequencer never moves. Tempo counts quarter notes, or eighth notes in 6/8.</p>
+      <p class="sub">Turning a pattern on turns on what it moves: Direct wind, or the Vox Humana stop. Direct wind and the treadles can't both supply the air: the treadle patterns rest while Direct wind is on, and turning one on turns Direct wind off. Your own feet still work alongside, and the helper pump adds a trickle on top.</p>
     </div>
     <div class="feet" id="feet"></div>
   </section>
@@ -415,9 +399,9 @@
 
 <section class="notes">
   <h2>Things to listen for</h2>
-  <div><h3>Let the organ pump itself</h3><p>Pedal autoplay works the treadles while you play. Hold a big chord and watch the gauge sink between strokes; set the pattern to Right, Left, Right, Left or raise the tempo and the wind holds. Ties make longer, slower strokes.</p></div>
+  <div><h3>Let the organ pump itself</h3><p>The modulation sequencer's treadle patterns work the pedals while you play: right on beat 1, left on beat 2. Hold a big chord and watch the gauge sink between strokes. Add strokes on beats 3 and 4 (a quick sweep up, then a sweep down) or raise the tempo, and the wind holds. Longer, gentler sweeps make slower strokes.</p></div>
   <div><h3>Easy wind</h3><p>Draw every stop and hold a big chord: the gauge sinks. Tick Easy wind and it climbs back and stays put. The reeds sound the same; the Use readout shows the air of only three of them.</p></div>
-  <div><h3>Let the wind run out</h3><p>Turn off Pedal autoplay, set the helper low, hold a chord and stop pumping. The sound gets quieter, then darker, and creeps a few cents sharp before the reeds stop speaking.</p></div>
+  <div><h3>Let the wind run out</h3><p>Turn off both treadle patterns in the modulation sequencer, set the helper low, hold a chord and stop pumping. The sound gets quieter, then darker, and creeps a few cents sharp before the reeds stop speaking.</p></div>
   <div><h3>Pump harder</h3><p>Strong, alternating strokes push the reeds harder. They get brighter and buzzier, and the pitch sinks a few cents flat. Push too hard and the relief valve vents.</p></div>
   <div><h3>Slow-motion feet</h3><p>Give a treadle a long attack and release. The organ swells in and fades away on its own, like a very patient player.</p></div>
   <div><h3>The shimmer</h3><p>Draw Celeste with Diapason. The Celeste reeds are tuned a little sharp so the two ranks beat against each other in a slow wave. Celeste beat sets how fast, the same on every note.</p></div>
@@ -430,7 +414,7 @@
   <div><h3>Couplers</h3><p>Draw Sub Octave and hold a chord: the keys an octave down sink with yours, and the bass grows heavy. Every coupled note is another set of reeds drinking wind.</p></div>
   <div><h3>Scoop into the tune</h3><p>Open Expression and set Scoop to a semitone. Hold a chord in the left hand and play a melody above it: each melody note slides up into pitch and lands dead in tune, while the chord stays put. Try S-curve for a more obvious bend, Top voice, leaps up so only the jumps scoop, or the mod wheel to ride the depth as you play.</p></div>
   <div><h3>Let long notes sing</h3><p>Open Expression and set Vibrato to about ±30 ¢. Play a quick run, then hold the last note: the run stays plain and the held note settles, then blooms into vibrato. Add a semitone of Scoop and the vibrato waits for each note to land first. Natural variation keeps it from sounding like a machine; Voice colour makes the tone shimmer with it. Set Delay to Never and Learn a knob or pedal to bring the vibrato in yourself.</p></div>
-  <div><h3>Let the pattern breathe</h3><p>Open Modulation sequencer and tick Play the pattern. Hold a chord: the wind swells up and back every bar, in time with Pedal autoplay's tempo, and the gauge follows it. Tap squares to add sweeps of your own, drag their ends to stretch them, and raise Amount for deeper swells. Set Starts on to Each note for a swell that restarts with every chord. Switch Moves to Vox Humana fan speed to make the fan race and slow in time, or to Knee swell to open and close the lid in rhythm.</p></div>
+  <div><h3>Let the pattern breathe</h3><p>In the modulation sequencer, pick Knee swell and tick Play this pattern. Hold a chord: the lid opens and closes every bar, in time with the treadles. Tap squares to add sweeps of your own, drag their ends to stretch them, and raise Amount for deeper swells. Set Starts on to Each note for a swell that restarts with every chord. Fan speed makes the Vox Humana race and slow in time; Direct wind takes over the air from the treadles and swells it.</p></div>
   <div><h3>Voice your own organ</h3><p>Open Rank voicing under Adjustments. Darken the Diapason, brighten the Principal, or detune a rank a few cents to hear how much a regulator's touch changes the instrument.</p></div>
 </section>
 

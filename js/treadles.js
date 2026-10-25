@@ -6,11 +6,14 @@ import { S, store } from './state.js';
 import { initAudio, thump } from './audio.js';
 import { mix } from './controls.js';
 
-// {side, gate, stage ('idle'|'a'|'d'|'s'|'r'), lvl 0…1, relFrom, boost, p:{a,d,s,r}}
+// {side, gate, stage ('idle'|'a'|'d'|'s'|'r'), lvl 0…1 (the foot's envelope),
+//  seq 0…1 (the sequencer's treadle lane, D32), relFrom, boost, p:{a,d,s,r}}
 export const ped = {
-  L: { side: 'L', name: 'Left', gate: false, stage: 'idle', lvl: 0, relFrom: 0, boost: 1, p: { ...DEFAULT_ENV, ...store.get('envL', {}) } },
-  R: { side: 'R', name: 'Right', gate: false, stage: 'idle', lvl: 0, relFrom: 0, boost: 1, p: { ...DEFAULT_ENV, ...store.get('envR', {}) } },
+  L: { side: 'L', name: 'Left', gate: false, stage: 'idle', lvl: 0, seq: 0, seqDown: false, relFrom: 0, boost: 1, p: { ...DEFAULT_ENV, ...store.get('envL', {}) } },
+  R: { side: 'R', name: 'Right', gate: false, stage: 'idle', lvl: 0, seq: 0, seqDown: false, relFrom: 0, boost: 1, p: { ...DEFAULT_ENV, ...store.get('envR', {}) } },
 };
+// How far the pedal is down: the player's foot or the sequencer, whichever is further.
+export const pedalLevel = P => Math.max(P.lvl, P.seq);
 let linkEl;
 
 export function gateOn(P) {
@@ -26,6 +29,17 @@ export function gateOff(P) {
   if (!P.gate) return;
   P.gate = false;
   if (P.lvl > 0) { P.stage = 'r'; P.relFrom = P.lvl; } else P.stage = 'idle';
+}
+
+// The sequencer's treadle lanes press the pedals too (D32), each frame. A
+// stroke starts when the pedal leaves the top: it gets the bonus for
+// alternating feet and the hinge thump, as a foot does.
+export function seqPedal(P, lvl) {
+  if (lvl > .02 && !P.seqDown) {
+    P.seqDown = true;
+    if (!P.gate) { P.boost = P.side !== S.lastSide ? 1 : .45; S.lastSide = P.side; thump(mix.thump / 100); }
+  } else if (lvl < .01) P.seqDown = false;
+  P.seq = lvl;
 }
 
 function setParam(P, k, v) {

@@ -7,9 +7,8 @@ import { windSpeech, speechTime, onsetTau, onsetShape, RISE_PER_TAU, TILT_RATIO 
 import { reedRand, reedTri, reedError, reedWindResponse, lockReeds } from "../../js/core/reeds.js";
 import { windLevel, windBright, windCents, windDrain, EASY_REEDS, KNEE, P_REF, gaugeInches, toTime, toSlider, fmtT, stepEnvelope, DEFAULT_ENV } from "../../js/core/wind.js";
 import { fanWaveCoefficients } from "../../js/core/fan.js";
-import { METERS, DEFAULT_PATTERN, normalise, reshape, nextCell, cellSeconds, noteAt, pedalsAt, liftGap } from "../../js/core/autoplay.js";
 import { scoopShape, scoopValue, scoopCurve, scoopDuration, scoopDepth, isTop, bendCents, SCOOP_CURVES, LEAP, KEY_VELOCITY, VIB_DELAY_MAX, vibDelaySec, delayFromCC, vibStart, vibFadeCurve, vibStartRate, wanderCurve } from "../../js/core/expression.js";
-import { SEQ_TARGETS, SEQ_TARGET_RANGE, toShare, fromShare, amountText, SEQ_CURVES, SEQ_ROWS, seqShape, DEFAULT_SEQ, normaliseSeq, placeNote, resizeNote, removeNote, setBars, seqValue, seqSteps, stepSeconds, seqPosition } from "../../js/core/modseq.js";
+import { SEQ_TARGETS, SEQ_TARGET_RANGE, toShare, fromShare, amountText, SEQ_CURVES, SEQ_ROWS, seqShape, DEFAULT_SEQ, normaliseSeq, placeNote, resizeNote, removeNote, seqValue, seqSteps, stepSeconds, seqPosition, METERS, stepsPerBar, stepsPerBeat, stroke, reshape, migrateSaved, FREE_LANES } from "../../js/core/modseq.js";
 import { volumeGain, bassCutHz, limiterMakeupDb, softClip, softClipCurve } from "../../js/core/output.js";
 
 const near = (a, b, tol, msg) => assert.ok(Math.abs(a - b) <= tol, `${msg ?? ""} expected ${b} ± ${tol}, got ${a}`);
@@ -198,45 +197,6 @@ test("D19: Cabinet bass slider maps to a 20–200 Hz corner, bottom is Off", () 
   near(bassCutHz(60), 79.6, 0.1); near(bassCutHz(100), 200, 1e-9); assert.ok(bassCutHz(0) < 10);
 });
 
-test("D22: the default autoplay pattern is one bar of 4/4, right and left quarter notes then a half rest", () => {
-  const p = normalise(DEFAULT_PATTERN);
-  assert.deepEqual(p, { on: true, meter: "4/4", measures: 1, cells: ["R", "L", "-", "-"] });
-  const c = cellSeconds(100);                                  // 0.6 s a beat
-  near(c, 0.6, 1e-12);
-  const at = (t) => pedalsAt(p.cells, c, t);
-  assert.deepEqual(at(0.05), { L: false, R: true, index: 0 });
-  assert.deepEqual(at(0.65), { L: true, R: false, index: 1 });
-  assert.deepEqual(at(1.3), { L: false, R: false, index: 2 });
-  assert.deepEqual(at(1.9), { L: false, R: false, index: 3 });
-  assert.deepEqual(at(2.45), { L: false, R: true, index: 0 }, "loops after 2.4 s");
-  assert.equal(at(0.6 - liftGap(c) + 0.01).R, false, "lifts just before the next beat");
-});
-
-test("D22: ties lengthen a stroke, wrap around the loop, and tie after a rest is silent", () => {
-  const c = 0.5;
-  const half = noteAt(["L", "~", "R", "-"], c, 0.7);
-  assert.equal(half.foot, "L"); near(half.start, 0, 1e-12); near(half.end, 1.0, 1e-12);
-  const wrap = noteAt(["~", "-", "-", "R"], c, 2.1);           // the tie on beat 1 holds beat 4's R into the next loop
-  assert.equal(wrap.foot, "R"); near(wrap.start, 1.5, 1e-12); near(wrap.end, 2.5, 1e-12);
-  assert.equal(noteAt(["-", "~", "-", "-"], c, 0.7).foot, null);
-  assert.equal(noteAt(["~", "~"], c, 0.2).foot, null, "all ties is silence");
-  // two strokes in a row on the same foot are separate strokes
-  const same = ["R", "R"]; assert.equal(pedalsAt(same, c, 0.49).R, false); assert.equal(pedalsAt(same, c, 0.51).R, true);
-});
-
-test("D22: editing: cycle order, reshaping meters and measures, and cleaning bad saved data", () => {
-  assert.deepEqual(["-", "L", "R", "~"].map(nextCell), ["L", "R", "~", "-"]);
-  const p = normalise({ meter: "4/4", measures: 2, cells: ["R", "L", "-", "~", "L", "R", "R", "L"] });
-  const three = reshape(p, "3/4", 2);
-  assert.deepEqual(three.cells, ["R", "L", "-", "L", "R", "R"], "each measure keeps its first beats");
-  const six = reshape(three, "6/8", 3);
-  assert.deepEqual(six.cells, ["R", "L", "-", "-", "-", "-", "L", "R", "R", "-", "-", "-", "-", "-", "-", "-", "-", "-"]);
-  assert.equal(six.cells.length, 3 * METERS["6/8"].beats);
-  assert.deepEqual(normalise({ meter: "7/9", measures: 9, cells: ["X"] }).cells.length, 16, "bad meter → 4/4, measures capped at 4");
-  assert.equal(normalise(null).on, true);
-  assert.equal(normalise({ on: false }).on, false);
-});
-
 test("D23: Easy wind charges for at most three reeds; off, every reed counts", () => {
   near(windDrain(0, 0, false), 0.018, 1e-12, "a little leakage with nothing playing");
   near(windDrain(2, 0, false), 0.018 + 0.042, 1e-12);
@@ -403,38 +363,84 @@ test("D30: notes stretch forwards or backwards, but not into their neighbours or
   assert.deepEqual(resizeNote(notes, 0, "start", -3, 16).notes[0], { row: "up-s", start: 0, len: 4 }, "the pattern's start");
 });
 
-test("D30: patterns load cleanly, off by default, and shrink to one bar keeping what fits", () => {
-  const d = normaliseSeq(undefined);
-  assert.equal(d.on, false); assert.equal(d.target, "direct"); assert.equal(d.trigger, "first"); assert.equal(d.bars, 1);
-  assert.deepEqual(d.notes, DEFAULT_SEQ.notes);
-  near(seqValue(d.notes, 16, .5, .25), .5, 1e-12, "the default pattern ends where it started, so it loops smoothly");
-  const bad = normaliseSeq({ bars: 3, trigger: "x", notes: [{ row: "up-s", start: 4, len: 4 }, { row: "nope", start: 0, len: 1 }, { row: "down-s", start: 6, len: 2 }, { row: "up-s", start: 14, len: 9 }] });
-  assert.equal(bad.bars, 1); assert.equal(bad.trigger, "first");
-  assert.deepEqual(bad.notes, [{ row: "up-s", start: 4, len: 4 }, { row: "up-s", start: 14, len: 2 }]);
-  const two = normaliseSeq({ bars: 2, notes: [{ row: "up-s", start: 12, len: 8 }, { row: "down-s", start: 24, len: 4 }] });
-  assert.equal(seqSteps(two.bars), 32);
-  assert.deepEqual(setBars(two, 1).notes, [{ row: "up-s", start: 12, len: 4 }]);
-});
-
-test("D30: the sequencer runs in 16th notes of the autoplay tempo and loops", () => {
-  near(stepSeconds(120), .125, 1e-12);
-  near(seqPosition(.5, 120, 16), 4, 1e-9);
-  near(seqPosition(2.25, 120, 16), 2, 1e-9, "one bar at 120 bpm is 2 s");
-  near(seqPosition(2.25, 120, 32), 18, 1e-9);
-});
-
-test("D31: the sequencer's targets, their ranges and the Amount readout", () => {
-  assert.deepEqual(SEQ_TARGETS, ["direct", "fan", "swell"]);
+test("D31, D32: the lanes, their ranges and the Amount readout", () => {
+  assert.deepEqual(SEQ_TARGETS, ["left", "right", "direct", "fan", "swell"]);
+  assert.deepEqual(FREE_LANES, ["left", "right"]);
   near(toShare("direct", 1.8), .5, 1e-12);
   near(toShare("fan", 9), 8 / 11, 1e-12);
   near(fromShare("fan", 0), 1, 1e-12); near(fromShare("fan", 1), 12, 1e-12);
   near(toShare("swell", 25), .25, 1e-12);
+  near(fromShare("left", .5), 50, 1e-12);
   for (const t of SEQ_TARGETS) for (const v of [SEQ_TARGET_RANGE[t][0], SEQ_TARGET_RANGE[t][1], 2.5]) near(fromShare(t, toShare(t, v)), v, 1e-9, t);
   assert.equal(amountText("direct", 25), "25% · 0.9″");
   assert.equal(amountText("fan", 25), "25% · 2.8 Hz");
   assert.equal(amountText("swell", 40), "40% of the swell");
+  assert.equal(amountText("right", 100), "100% of a stroke");
   assert.equal(amountText("fan", 0), "None");
-  assert.equal(normaliseSeq({ target: "fan" }).target, "fan");
-  assert.equal(normaliseSeq({ target: "swell" }).target, "swell");
-  assert.equal(normaliseSeq({ target: "volume" }).target, "direct");
 });
+
+test("D32: time signatures: 16th notes, the tempo counting quarters or (in 6/8) eighths", () => {
+  assert.deepEqual(Object.keys(METERS), ["2/4", "3/4", "4/4", "5/4", "6/8"]);
+  assert.deepEqual(Object.keys(METERS).map(stepsPerBar), [8, 12, 16, 20, 12]);
+  assert.equal(stepsPerBeat("6/8"), 2); assert.equal(stepsPerBeat("3/4"), 4);
+  assert.equal(seqSteps("5/4", 4), 80);
+  near(stepSeconds(120, "4/4"), .125, 1e-12);
+  near(stepSeconds(120, "6/8"), .25, 1e-12, "an eighth at 120 is two 16ths");
+  near(seqPosition(.5, 120, "4/4", 16), 4, 1e-9);
+  near(seqPosition(2.25, 120, "4/4", 16), 2, 1e-9, "one bar at 120 bpm is 2 s");
+  near(seqPosition(2.25, 120, "4/4", 32), 18, 1e-9);
+  near(seqPosition(2.4, 100, "3/4", 12), 4, 1e-9, "one bar of 3/4 at 100 bpm is 1.8 s, so 2.4 s is 4 16ths into the next");
+});
+
+test("D32: the defaults: the treadles pump autoplay's pattern, everything else off", () => {
+  const d = normaliseSeq(undefined);
+  assert.equal(d.meter, "4/4"); assert.equal(d.bars, 1); assert.equal(d.trigger, "first"); assert.equal(d.edit, "left");
+  assert.deepEqual(d.lanes, DEFAULT_SEQ.lanes);
+  assert.equal(d.lanes.left.on && d.lanes.right.on, true);
+  assert.equal(d.lanes.direct.on || d.lanes.fan.on || d.lanes.swell.on, false);
+  assert.deepEqual(d.lanes.right.notes, stroke(0), "right on beat 1");
+  assert.deepEqual(d.lanes.left.notes, stroke(4), "left on beat 2");
+  assert.equal(d.lanes.left.amount, 1); assert.equal(d.lanes.fan.amount, .25);
+  // a stroke presses and lets the pedal up again, so the next one starts from the top
+  near(seqValue(d.lanes.right.notes, 0, 0, 1), 0, 1e-12);
+  near(seqValue(d.lanes.right.notes, 1, 0, 1), 1, 1e-12, "fully down after one 16th");
+  near(seqValue(d.lanes.right.notes, 3, 0, 1), 0, 1e-12, "up again after three");
+  near(seqValue(d.lanes.direct.notes, 16, .5, .25), .5, 1e-12, "the swell pattern ends where it started, so it loops smoothly");
+});
+
+test("D32: strokes get longer and slower with the note, and keep a 16th to spare", () => {
+  assert.deepEqual(stroke(0, 4), [{ row: "up-fast", start: 0, len: 1 }, { row: "down-fast", start: 1, len: 2 }]);
+  assert.deepEqual(stroke(8, 8), [{ row: "up-fast", start: 8, len: 2 }, { row: "down-fast", start: 10, len: 5 }]);
+  assert.deepEqual(stroke(0, 2), [{ row: "up-fast", start: 0, len: 1 }, { row: "down-fast", start: 1, len: 1 }], "an eighth in 6/8");
+});
+
+test("D32: patterns load cleanly, and changing time or bars keeps each bar's notes", () => {
+  const bad = normaliseSeq({ meter: "7/9", bars: 9, trigger: "x", edit: "volume", lanes: { fan: { on: "yes", amount: 3, notes: [{ row: "up-s", start: 4, len: 4 }, { row: "nope", start: 0, len: 1 }, { row: "down-s", start: 6, len: 2 }, { row: "up-s", start: 14, len: 9 }] } } });
+  assert.equal(bad.meter, "4/4"); assert.equal(bad.bars, 1); assert.equal(bad.trigger, "first"); assert.equal(bad.edit, "left");
+  assert.equal(bad.lanes.fan.on, false); assert.equal(bad.lanes.fan.amount, .25);
+  assert.deepEqual(bad.lanes.fan.notes, [{ row: "up-s", start: 4, len: 4 }, { row: "up-s", start: 14, len: 2 }]);
+  assert.deepEqual(bad.lanes.left, DEFAULT_SEQ.lanes.left, "a missing lane takes its default");
+  const p = normaliseSeq({ meter: "4/4", bars: 2, lanes: { swell: { notes: [{ row: "up-s", start: 2, len: 4 }, { row: "down-s", start: 14, len: 2 }, { row: "up-s", start: 18, len: 8 }] } } });
+  const three = reshape(p, "3/4", 2);
+  assert.deepEqual(three.lanes.swell.notes, [{ row: "up-s", start: 2, len: 4 }, { row: "up-s", start: 14, len: 8 }], "the note past a 3/4 bar's end goes; bar 2's moves with its bar");
+  assert.deepEqual(reshape(three, "3/4", 1).lanes.swell.notes, [{ row: "up-s", start: 2, len: 4 }]);
+  assert.equal(seqSteps(reshape(p, "6/8", 4).meter, 4), 48);
+});
+
+test("D32: saved autoplay and sequencer patterns carry over", () => {
+  const a = migrateSaved({ autoplay: { on: true, meter: "3/4", measures: 2, cells: ["R", "~", "L", "R", "-", "-"] } });
+  assert.equal(a.meter, "3/4"); assert.equal(a.bars, 2);
+  assert.deepEqual(a.lanes.right.notes, [...stroke(0, 8), ...stroke(12, 4)], "a tied stroke is longer and slower");
+  assert.deepEqual(a.lanes.left.notes, stroke(8, 4));
+  assert.equal(migrateSaved({ autoplay: { on: false, meter: "4/4", measures: 1, cells: ["R", "L", "-", "-"] } }).lanes.left.on, false, "autoplay off: the treadle patterns start off");
+  const eighths = migrateSaved({ autoplay: { on: true, meter: "6/8", measures: 1, cells: ["L", "-", "-", "R", "-", "-"] } });
+  assert.deepEqual(eighths.lanes.right.notes, stroke(6, 2));
+  const m = migrateSaved({ modseq: { on: true, target: "fan", bars: 2, trigger: "each", notes: [{ row: "up-s", start: 2, len: 4 }, { row: "down-s", start: 20, len: 2 }] }, amount: 40 });
+  assert.equal(m.lanes.fan.on, true); near(m.lanes.fan.amount, .4, 1e-12); assert.equal(m.trigger, "each"); assert.equal(m.bars, 2);
+  assert.deepEqual(m.lanes.fan.notes, [{ row: "up-s", start: 2, len: 4 }, { row: "down-s", start: 20, len: 2 }]);
+  assert.deepEqual(m.lanes.right, DEFAULT_SEQ.lanes.right, "no saved autoplay: the default pumping");
+  const both = migrateSaved({ autoplay: { on: true, meter: "3/4", measures: 1, cells: ["R", "L", "-"] }, modseq: { on: false, target: "direct", bars: 1, notes: [{ row: "up-s", start: 13, len: 2 }, { row: "up-s", start: 3, len: 2 }] } });
+  assert.deepEqual(both.lanes.direct.notes, [{ row: "up-s", start: 3, len: 2 }], "a 4/4 note past a 3/4 bar is dropped");
+  assert.deepEqual(migrateSaved({}), normaliseSeq(), "nothing saved: the defaults");
+});
+

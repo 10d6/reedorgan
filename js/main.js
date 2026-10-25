@@ -7,7 +7,6 @@ import { setupControls } from './controls.js';
 import { setupStops } from './stops.js';
 import { setupKeys } from './keys.js';
 import { setupTreadles } from './treadles.js';
-import { setupAutoplay } from './autoplay.js';
 import { setupModSeq } from './modseq.js';
 import { setupInfo } from './info.js';
 import { startWindLoop } from './wind-loop.js';
@@ -16,7 +15,6 @@ setupControls();   // sliders, selects and saved settings (the sound reads these
 setupStops();      // stop rail and divided-stops selector
 setupKeys();       // on-screen keyboard, computer keys, MIDI
 setupTreadles();   // pedals and their envelopes
-setupAutoplay();   // the pedal autoplay pattern editor
-setupModSeq();     // the modulation sequencer's piano roll (D30)
+setupModSeq();     // the modulation sequencer's lanes and piano roll; it also pumps the treadles (D30–D32)
 setupInfo();       // the info buttons that show and hide each section's explanations
 startWindLoop();   // gauge and the per-frame wind simulation
