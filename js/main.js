@@ -8,6 +8,7 @@ import { setupStops } from './stops.js';
 import { setupKeys } from './keys.js';
 import { setupTreadles } from './treadles.js';
 import { setupModSeq } from './modseq.js';
+import { setupPatches } from './patches.js';
 import { setupInfo } from './info.js';
 import { startWindLoop } from './wind-loop.js';
 
@@ -16,5 +17,6 @@ setupStops();      // stop rail and divided-stops selector
 setupKeys();       // on-screen keyboard, computer keys, MIDI
 setupTreadles();   // pedals and their envelopes
 setupModSeq();     // the modulation sequencer's lanes and piano roll; it also pumps the treadles (D30–D32)
+setupPatches();    // patches: every setting above has registered; load the patch the organ opens with (D33)
 setupInfo();       // the info buttons that show and hide each section's explanations
 startWindLoop();   // gauge and the per-frame wind simulation

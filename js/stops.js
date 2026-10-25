@@ -5,6 +5,7 @@ import { RANKS, HALVES, SPLITS } from './core/ranks.js';
 import { S, stops, store } from './state.js';
 import { initAudio, applyStops } from './audio.js';
 import { recouple, rebuildKeys } from './keys.js';
+import { patchField } from './patches.js';
 
 let stopsEl;
 
@@ -57,12 +58,29 @@ export function drawVox() {
 export function setupStops() {
   stopsEl = document.getElementById('stops');
   const splitEl = document.getElementById('split');
-  splitEl.value = S.splitMode;
-  splitEl.addEventListener('change', () => {
-    S.splitMode = splitEl.value; store.set('split', S.splitMode);
+  const setSplit = v => {
+    S.splitMode = v; splitEl.value = v;
     // undividing keeps any rank drawn in either half
-    if (S.splitMode === 'none') RANKS.forEach(r => { const v = !!(stops.bass[r.id] || stops.treble[r.id]); stops.bass[r.id] = v; stops.treble[r.id] = v; });
+    if (S.splitMode === 'none') RANKS.forEach(r => { const on = !!(stops.bass[r.id] || stops.treble[r.id]); stops.bass[r.id] = on; stops.treble[r.id] = on; });
     renderStops(); rebuildKeys(); applyStops();
-  });
+  };
+  splitEl.value = S.splitMode;
+  splitEl.addEventListener('change', () => setSplit(splitEl.value));
   renderStops();
+  // Patches (D33) hold the divided-stops setting, then the drawn stops and couplers.
+  patchField('split', { def: 'none', get: () => S.splitMode, set: setSplit, ok: v => !!SPLITS[v] });
+  const half = h => Object.fromEntries(RANKS.map(r => [r.id, !!stops[h][r.id]]));
+  const factory = { bass: { ...half('bass') }, treble: { ...half('treble') }, vox: false, sub: false, sup: false };
+  patchField('stops', {
+    def: factory,
+    get: () => ({ bass: half('bass'), treble: half('treble'), vox: !!stops.vox, sub: !!stops.sub, sup: !!stops.sup }),
+    set: v => {
+      for (const h of HALVES) RANKS.forEach(r => { stops[h][r.id] = !!(v[h] && v[h][r.id]); });
+      if (S.splitMode === 'none') RANKS.forEach(r => { stops.treble[r.id] = stops.bass[r.id]; });
+      stops.vox = !!v.vox; stops.sub = !!v.sub; stops.sup = !!v.sup;
+      renderStops(); applyStops(); recouple();
+    },
+    ok: v => !!v && typeof v === 'object' && !!v.bass && !!v.treble,
+    legacy: () => undefined,   // stops were never saved before patches
+  });
 }

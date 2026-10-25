@@ -2,7 +2,6 @@
 // mutate `stops` and `voices` in place.
 
 import { SPLITS } from './core/ranks.js';
-import { SCOOP_MODES, SCOOP_CURVES, VIB_MODES } from './core/expression.js';
 
 // Settings saved in this browser, under reed-<key>. Never throws.
 export const store = {
@@ -18,19 +17,21 @@ export const S = {
   reliefT: 0,          // seconds left of relief-valve venting
   lastSide: null,      // which treadle was pressed last
   started: false,      // a note has been played
-  splitMode: saved('split', 'none', v => !!SPLITS[v]),
-  compass: saved('compass', 'full', v => v === 'full' || v === 'organ'),
-  easyWind: saved('easyWind', false, v => typeof v === 'boolean'),
-  directWind: saved('directWind', false, v => typeof v === 'boolean'),
+  // The sound's choices start at their factory settings; patches set them (D33).
+  splitMode: 'none',
+  compass: 'full',
+  easyWind: false,
+  directWind: false,
+  toneModel: 'tilt',
+  voxShape: 'sine',
+  scoopMode: 'top',    // Expression (D28)
+  scoopCurve: 'ease',
+  vibMode: 'top',      // D29
+  // Your setup, remembered automatically: the learned MIDI controls.
   directCC: saved('directCC', 7, v => Number.isInteger(v) && v >= 0 && v < 120),   // MIDI control for Direct wind (D27)
-  toneModel: saved('toneModel', 'tilt', v => v === 'tilt' || v === 'sweep'),
-  voxShape: saved('voxShape', 'sine', v => v === 'sine' || v === 'fan'),
-  scoopMode: saved('scoopMode', 'top', v => SCOOP_MODES.includes(v)),        // Expression (D28)
-  scoopCurve: saved('scoopCurve', 'ease', v => SCOOP_CURVES.includes(v)),
-  vibMode: saved('vibMode', 'top', v => VIB_MODES.includes(v)),               // D29
   vibCC: saved('vibCC', null, v => v === null || (Number.isInteger(v) && v >= 0 && v < 120)),   // controller for Vibrato delay, none by default
   wheel: [0, 64],      // the MIDI pitch wheel's last position (LSB, MSB); centre is no bend
-  reedSeed: store.get('reedSeed', 1),
+  reedSeed: 1,
 };
 
 // Each rank can be drawn separately in the bass and treble halves (divided stops).

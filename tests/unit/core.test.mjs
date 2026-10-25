@@ -9,6 +9,7 @@ import { windLevel, windBright, windCents, windDrain, EASY_REEDS, KNEE, P_REF, g
 import { fanWaveCoefficients } from "../../js/core/fan.js";
 import { scoopShape, scoopValue, scoopCurve, scoopDuration, scoopDepth, isTop, bendCents, SCOOP_CURVES, LEAP, KEY_VELOCITY, VIB_DELAY_MAX, vibDelaySec, delayFromCC, vibStart, vibFadeCurve, vibStartRate, wanderCurve } from "../../js/core/expression.js";
 import { SEQ_TARGETS, SEQ_TARGET_RANGE, toShare, fromShare, amountText, SEQ_CURVES, SEQ_ROWS, seqShape, DEFAULT_SEQ, normaliseSeq, placeNote, resizeNote, removeNote, seqValue, seqSteps, stepSeconds, seqPosition, METERS, stepsPerBar, stepsPerBeat, stroke, reshape, migrateSaved, FREE_LANES } from "../../js/core/modseq.js";
+import { PATCH_VERSION, FACTORY, NAME_MAX, cleanName, uniqueName, sortNames, sameSettings, normaliseLibrary, patchFile, fileName, readPatchFile } from "../../js/core/patches.js";
 import { volumeGain, bassCutHz, limiterMakeupDb, softClip, softClipCurve } from "../../js/core/output.js";
 
 const near = (a, b, tol, msg) => assert.ok(Math.abs(a - b) <= tol, `${msg ?? ""} expected ${b} ± ${tol}, got ${a}`);
@@ -444,3 +445,43 @@ test("D32: saved autoplay and sequencer patterns carry over", () => {
   assert.deepEqual(migrateSaved({}), normaliseSeq(), "nothing saved: the defaults");
 });
 
+
+test("D33: patch names are tidied, never Factory, and made unique", () => {
+  assert.equal(cleanName("  Sunday   hymn "), "Sunday hymn");
+  assert.equal(cleanName("x".repeat(60)).length, NAME_MAX);
+  assert.equal(uniqueName("Hymn", []), "Hymn");
+  assert.equal(uniqueName("Hymn", ["Hymn"]), "Hymn (2)");
+  assert.equal(uniqueName("Hymn", ["Hymn", "Hymn (2)"]), "Hymn (3)");
+  assert.equal(uniqueName("Factory", []), "Factory (2)");
+  assert.equal(uniqueName("   ", []), "Untitled");
+  assert.ok(uniqueName("y".repeat(40), ["y".repeat(40)]).length <= NAME_MAX);
+  assert.deepEqual(sortNames(["choir", "Bright", "anthem"]), ["anthem", "Bright", "choir"]);
+});
+
+test("D33: settings compare by content, whatever order their keys were built in", () => {
+  assert.ok(sameSettings({ a: 1, b: { x: [1, 2], y: true } }, { b: { y: true, x: [1, 2] }, a: 1 }));
+  assert.ok(!sameSettings({ a: 1 }, { a: 2 }));
+  assert.ok(!sameSettings({ a: [1, 2] }, { a: [2, 1] }));
+  assert.ok(!sameSettings({ a: 1 }, { a: 1, b: 0 }));
+});
+
+test("D33: the saved library keeps only usable patches, and never Factory", () => {
+  const lib = normaliseLibrary({ "Hymn": { version: 1, settings: { swell: 40 } }, " Choir ": { settings: {} }, "Factory": { settings: {} }, "Bad": { settings: [1] }, "": { settings: {} }, "None": null });
+  assert.deepEqual(Object.keys(lib), ["Hymn", "Choir"]);
+  assert.equal(lib.Choir.version, PATCH_VERSION);
+  assert.deepEqual(normaliseLibrary([1, 2]), {});
+  assert.deepEqual(normaliseLibrary(null), {});
+});
+
+test("D33: patches go to files and come back; other files are refused with a reason", () => {
+  const f = patchFile("Sunday hymn", { swell: 40, seq: { meter: "3/4" } });
+  assert.equal(fileName("Sunday hymn!"), "sunday-hymn.reedorgan.json");
+  assert.equal(fileName("***"), "patch.reedorgan.json");
+  assert.deepEqual(readPatchFile(JSON.stringify(f)), { name: "Sunday hymn", settings: { swell: 40, seq: { meter: "3/4" } } });
+  assert.equal(readPatchFile(JSON.stringify({ ...f, name: "" })).name, "Imported patch");
+  assert.throws(() => readPatchFile("not json"), /can’t be read/);
+  assert.throws(() => readPatchFile(JSON.stringify({ hello: 1 })), /isn’t a reed organ patch/);
+  assert.throws(() => readPatchFile(JSON.stringify({ ...f, settings: [] })), /isn’t a reed organ patch/);
+  assert.throws(() => readPatchFile(JSON.stringify({ ...f, version: PATCH_VERSION + 1 })), /newer version/);
+  assert.equal(FACTORY, "Factory");
+});

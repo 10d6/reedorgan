@@ -15,6 +15,7 @@ changes the organ's loudness, brightness, pitch and how quickly notes speak.
 | Steady wind | Tick **Easy wind** (in Treadles) so chords and extra stops use no more air than three notes. Or raise the sequencer's tempo or add treadle strokes, or raise **Helper pump** under Adjustments (2% by default). If you play more than the wind supplies, it slowly runs out |
 | Swell | Move the **Knee swell** slider, or use a MIDI expression pedal (CC11 or CC4) |
 | Volume | The **Volume** slider. Above 100% a limiter keeps loud chords clean |
+| Patches | The **Patch** bar across the top saves the whole sound by name: stops, voicing, wind, fan, Expression and the sequencer. **Save as…** names a new one; **Save** keeps changes to the one you're on; *edited* means there are unsaved changes, and **Revert** drops them. The organ opens with the patch you last loaded or saved. **Download** and **Load file…** move patches between browsers and devices |
 | Direct wind | Tick **Direct wind** (top right) and its slider sets the air in the reservoir by itself; the treadles (yours or the sequencer's) and playing no longer change it. Your MIDI keyboard's volume knob (CC7) or a breath controller (CC2) moves it; **Learn** binds any other knob. With Direct wind off, the volume knob sets Volume |
 | Stuck note | **All notes off** (top right), or `Esc` |
 | Explanations | Tap the small **i** beside any heading to show or hide what its controls do |
@@ -111,7 +112,7 @@ changes the organ's loudness, brightness, pitch and how quickly notes speak.
   voicing. Brightness reshapes the rank's harmonics and is level-matched, so it
   changes the tone rather than the volume.
 
-Settings are remembered in your browser.
+Nothing about the sound is saved until you save a patch: patches are kept in your browser, and Download saves one as a file. Volume, the learned MIDI controls and which panels are open are remembered on their own. Settings from before patches became a patch called *My settings*.
 
 ## How the repository works
 

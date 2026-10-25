@@ -1,8 +1,9 @@
-// Settings are remembered in the browser; resets and readouts work.
+// Settings are kept in saved patches (D33), the page layout is remembered on its
+// own, and resets and readouts work.
 import { test, expect } from "@playwright/test";
-import { openOrgan, setSlider, readout } from "./organ.js";
+import { openOrgan, setSlider, readout, savePatch } from "./organ.js";
 
-test("slider, select and drawer settings survive a reload", async ({ page }) => {
+test("slider and select settings come back with their saved patch; open drawers are remembered on their own", async ({ page }) => {
   await openOrgan(page, { quiet: false });
   await setSlider(page, "swellAmt", 40);
   await setSlider(page, "resAmt", 100);
@@ -15,7 +16,9 @@ test("slider, select and drawer settings survive a reload", async ({ page }) => 
   await page.click("#voxPanel summary");                      // the fan's controls fold away (D25)
   await page.selectOption("#voxShape", "fan");
   await page.$eval("#voicing", (d) => { d.open = true; d.dispatchEvent(new Event("toggle")); });
+  await savePatch(page, "Everything");
   await page.reload();
+  await expect(page.locator("#patchSel")).toHaveValue("Everything");
   await expect(page.locator("#swellOut")).toHaveText("40%");
   await expect(page.locator("#resOut")).toHaveText("3.0×");
   await expect(page.locator("#scatterOut")).toHaveText("±2.5 ¢");
@@ -51,16 +54,22 @@ test("restore factory voicing resets every rank", async ({ page }) => {
   await expect(page.locator("#brPrincipalOut")).toHaveText("Factory");
 });
 
-test("fitting new reeds changes the saved reed set", async ({ page }) => {
+test("fitting new reeds changes the sound's reed set, which is kept in the patch", async ({ page }) => {
   await openOrgan(page, { quiet: false });
+  const seed = (name) => page.evaluate((n) => JSON.parse(localStorage.getItem("reed-patches"))[n].settings.reedSeed, name);
   await page.click("#newReeds");
-  const first = await page.evaluate(() => localStorage.getItem("reed-reedSeed"));
+  await expect(page.locator("#patchEdited")).toBeVisible();   // a new reed set is a change to the sound
+  await savePatch(page, "Reeds A");
+  const first = await seed("Reeds A");
   await page.click("#newReeds");
-  const second = await page.evaluate(() => localStorage.getItem("reed-reedSeed"));
-  expect(first).not.toBeNull();
+  await savePatch(page, "Reeds B");
+  const second = await seed("Reeds B");
+  expect(first).not.toBe(1);
   expect(second).not.toBe(first);
   await page.reload();
-  expect(await page.evaluate(() => localStorage.getItem("reed-reedSeed"))).toBe(second);
+  await expect(page.locator("#patchSel")).toHaveValue("Reeds B");
+  await expect(page.locator("#patchEdited")).toBeHidden();
+  expect(await page.evaluate(() => localStorage.getItem("reed-reedSeed"))).toBeNull();   // nothing saves itself any more
 });
 
 test("readouts use the documented formats", async ({ page }) => {
