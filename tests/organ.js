@@ -55,6 +55,37 @@ function instrument() {
     let s = 0; for (let i = 0; i < a.length; i++) s += a[i] * a[i] + b[i] * b[i];
     return Math.sqrt(s / (2 * a.length));
   };
+  // 4. Pitch: the fundamental of what's playing, by autocorrelation of the left
+  //    ear's last 1024 samples, between lo and hi Hz. Returns [hz, clarity]
+  //    (clarity 1 = perfectly periodic) or null when it's too quiet to tell.
+  window.__pitch = (lo = 80, hi = 1000) => {
+    const e = window.__ears; if (!e) return null;
+    const x = new Float32Array(e.L.fftSize); e.L.getFloatTimeDomainData(x);
+    const sr = e.ctx.sampleRate, n = x.length;
+    let energy = 0; for (let i = 0; i < n; i++) energy += x[i] * x[i];
+    if (Math.sqrt(energy / n) < 2e-4) return null;
+    const minLag = Math.floor(sr / hi), maxLag = Math.min(n - 64, Math.ceil(sr / lo));
+    const r = new Float32Array(maxLag + 2);
+    for (let lag = minLag - 1; lag <= maxLag + 1; lag++) {
+      let s = 0, a = 0, b = 0;
+      for (let i = 0; i + lag < n; i++) { s += x[i] * x[i + lag]; a += x[i] * x[i]; b += x[i + lag] * x[i + lag]; }
+      r[lag] = s / Math.sqrt(a * b || 1);
+    }
+    let best = minLag; for (let lag = minLag; lag <= maxLag; lag++) if (r[lag] > r[best]) best = lag;
+    // the first peak nearly as strong as the best, so an octave down isn't chosen
+    for (let lag = minLag; lag < best; lag++) if (r[lag] > .93 * r[best] && r[lag] >= r[lag - 1] && r[lag] >= r[lag + 1]) { best = lag; break; }
+    const y0 = r[best - 1], y1 = r[best], y2 = r[best + 1], d = y0 - 2 * y1 + y2;
+    const shift = d ? .5 * (y0 - y2) / d : 0;
+    return [sr / (best + shift), y1];
+  };
+  // Runs `start` (a MIDI message or none), then records the pitch every ~6 ms for
+  // `ms`: [[seconds since start, hz, clarity], …], skipping silent moments.
+  window.__pitchTrace = (ms, msgs = [], lo, hi) => new Promise((done) => {
+    const e = window.__ears, t0 = e.ctx.currentTime, out = [];
+    msgs.forEach(([a, b, c]) => window.__midi(a, b, c));
+    const iv = setInterval(() => { const p = window.__pitch(lo, hi); if (p) out.push([e.ctx.currentTime - t0, p[0], p[1]]); }, 6);
+    setTimeout(() => { clearInterval(iv); done(out); }, ms);
+  });
   window.__centroid = () => {
     const e = window.__ears; const f = new Float32Array(e.L.frequencyBinCount); e.L.getFloatFrequencyData(f);
     const bin = e.ctx.sampleRate / e.L.fftSize; let n = 0, d = 0;
@@ -107,6 +138,12 @@ export async function letGo(page, ...keys) { for (const k of keys) await page.ke
 export async function keysDown(page) {
   return page.$$eval(".key.down", (els) => els.map((e) => Number(e.dataset.midi)).sort((a, b) => a - b));
 }
+
+/** Cents from `ref` to `hz`. */
+export const cents = (hz, ref) => 1200 * Math.log2(hz / ref);
+/** Plays MIDI messages and traces the pitch for `ms`: [[s, hz, clarity], …]. */
+export const pitchTrace = (page, ms, msgs = [], lo = 80, hi = 1000) =>
+  page.evaluate(([t, m, l, h]) => window.__pitchTrace(t, m, l, h), [ms, msgs, lo, hi]);
 
 export const readout = (page, id) => page.locator("#" + id).textContent();
 export const rms = (page) => page.evaluate(() => window.__rms());

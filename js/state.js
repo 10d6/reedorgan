@@ -2,6 +2,7 @@
 // mutate `stops` and `voices` in place.
 
 import { SPLITS } from './core/ranks.js';
+import { SCOOP_MODES, SCOOP_CURVES } from './core/expression.js';
 
 // Settings saved in this browser, under reed-<key>. Never throws.
 export const store = {
@@ -24,6 +25,9 @@ export const S = {
   directCC: saved('directCC', 7, v => Number.isInteger(v) && v >= 0 && v < 120),   // MIDI control for Direct wind (D27)
   toneModel: saved('toneModel', 'tilt', v => v === 'tilt' || v === 'sweep'),
   voxShape: saved('voxShape', 'sine', v => v === 'sine' || v === 'fan'),
+  scoopMode: saved('scoopMode', 'top', v => SCOOP_MODES.includes(v)),        // Expression (D28)
+  scoopCurve: saved('scoopCurve', 'ease', v => SCOOP_CURVES.includes(v)),
+  wheel: [0, 64],      // the MIDI pitch wheel's last position (LSB, MSB); centre is no bend
   reedSeed: store.get('reedSeed', 1),
 };
 

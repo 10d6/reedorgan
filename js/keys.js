@@ -2,7 +2,8 @@
 // pointer, computer keys and MIDI.
 
 import { S, stops, voices, splitNote, store } from './state.js';
-import { initAudio, noteOn, noteOff, silenceAll, ctx } from './audio.js';
+import { initAudio, noteOn, noteOff, silenceAll, unscoop, applyBend, ctx } from './audio.js';
+import { scoopDepth, isTop, CHORD_WINDOW } from './core/expression.js';
 import { ctl } from './controls.js';
 import { ped, gateOn, gateOff } from './treadles.js';
 
@@ -62,8 +63,29 @@ const inCompass = n => { const c = COMPASS[S.compass] || COMPASS.full; return n 
 // A coupler past the end of the compass has no key to pull, so it stays silent.
 const coupled = new Map();   // played key -> list of sets of notes it is holding down
 const couplesFor = m => [m, ...(stops.sub ? [m - 12] : []), ...(stops.sup ? [m + 12] : [])].filter(inCompass);
-export function press(m) {
-  const set = couplesFor(m); set.forEach(noteOn);
+/* ---------- expression (D28) ---------- */
+// The top voice is the highest key being held. A chord's notes arrive a few
+// milliseconds apart in any order, so a lower note can be the top voice for an
+// instant; when a higher one follows within CHORD_WINDOW, the lower note was part
+// of the chord, gives up its scoop, and doesn't count as the melody's last note.
+let topKey = null, topAt = -Infinity, topBefore = null, topSet = null;
+function expressionFor(m, velocity) {
+  const held = [...coupled.keys()].filter(k => k !== m), now = performance.now() / 1000;
+  const top = isTop(m, held);
+  let prev = topKey;
+  if (top && topKey != null && topKey < m && now - topAt < CHORD_WINDOW) {
+    prev = topBefore;
+    if (topSet) unscoop(topSet);
+  }
+  const cents = scoopDepth({ mode: S.scoopMode, depth: ctl.scoopDepth.value, m, held, lastTop: prev, velocity });
+  if (top) { topBefore = prev; topKey = m; topAt = now; topSet = null; }
+  return { cents, time: ctl.scoopTime.value, curve: S.scoopCurve, top };
+}
+// Every coupled octave of a key gets the same Expression, so they bend together.
+export function press(m, velocity = 100) {
+  const set = couplesFor(m), ex = expressionFor(m, velocity);
+  set.forEach(n => noteOn(n, ex));
+  if (ex.top && (S.scoopMode === 'top' || S.scoopMode === 'leaps')) topSet = set;
   if (!coupled.has(m)) coupled.set(m, []); coupled.get(m).push(set);
 }
 export function release(m) {
@@ -101,6 +123,7 @@ function showCC() {
 // button, Escape, and MIDI all-notes-off.
 export function allNotesOff() {
   kbHeld.clear(); ptrs.clear(); midiHeld.clear(); sustained.clear(); coupled.clear();
+  topKey = topBefore = topSet = null; topAt = -Infinity;
   silenceAll();
 }
 function setMidi(msg, cls) { midiStatus.textContent = msg; midiStatus.className = 'midi-status' + (cls ? ' ' + cls : ''); }
@@ -123,7 +146,8 @@ function bindInputs() {
   if (names.length) setMidi('Listening to ' + names.join(', '), 'on');
   else setMidi('No MIDI inputs found. Plug one in and it connects automatically.');
 }
-// Notes, CC64 sustain, CC11/CC4 expression (knee swell), CC120/123 all notes off.
+// Notes (with velocity, for Expression), the pitch wheel, CC1 mod wheel (Scoop
+// depth), CC64 sustain, CC11/CC4 expression (knee swell), CC120/123 all notes off.
 function onMidi(ev) {
   const [st, d1, d2] = ev.data, cmd = st & 0xf0;
   if (cmd === 0x90 && d2 > 0) {
@@ -131,7 +155,9 @@ function onMidi(ev) {
     if (midiHeld.has(d1)) return;
     midiHeld.add(d1);
     if (sustained.has(d1)) { sustained.delete(d1); return; } // still sounding from the damper
-    press(d1);
+    press(d1, d2);
+  } else if (cmd === 0xE0) {
+    S.wheel = [d1, d2]; applyBend();   // the pitch wheel (D28)
   } else if (cmd === 0x80 || (cmd === 0x90 && d2 === 0)) {
     if (!midiHeld.has(d1)) return;
     midiHeld.delete(d1);
@@ -145,6 +171,8 @@ function onMidi(ev) {
     if (d1 === 64) {
       sustain = d2 >= 64;
       if (!sustain) { sustained.forEach(release); sustained.clear(); }
+    } else if (d1 === 1) {
+      ctl.scoopDepth.set(Math.round(d2 / 127 * 40) * 5);   // the mod wheel sets Scoop depth (D28)
     } else if (d1 === 11 || d1 === 4) {
       ctl.swell.set(Math.round(d2 / 127 * 100));
     } else if (d1 === 2) {

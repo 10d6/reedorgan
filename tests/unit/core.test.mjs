@@ -8,6 +8,7 @@ import { reedRand, reedTri, reedError, reedWindResponse, lockReeds } from "../..
 import { windLevel, windBright, windCents, windDrain, EASY_REEDS, KNEE, P_REF, gaugeInches, toTime, toSlider, fmtT, stepEnvelope, DEFAULT_ENV } from "../../js/core/wind.js";
 import { fanWaveCoefficients } from "../../js/core/fan.js";
 import { METERS, DEFAULT_PATTERN, normalise, reshape, nextCell, cellSeconds, noteAt, pedalsAt, liftGap } from "../../js/core/autoplay.js";
+import { scoopShape, scoopValue, scoopCurve, scoopDuration, scoopDepth, isTop, bendCents, SCOOP_CURVES, LEAP } from "../../js/core/expression.js";
 import { volumeGain, bassCutHz, limiterMakeupDb, softClip, softClipCurve } from "../../js/core/output.js";
 
 const near = (a, b, tol, msg) => assert.ok(Math.abs(a - b) <= tol, `${msg ?? ""} expected ${b} ± ${tol}, got ${a}`);
@@ -243,4 +244,53 @@ test("D23: Easy wind charges for at most three reeds; off, every reed counts", (
   near(windDrain(30, 0, true), windDrain(3, 0, false), 1e-12, "capped at three reeds");
   near(windDrain(2, 0, true), windDrain(2, 0, false), 1e-12, "below the cap, the same as off");
   near(windDrain(30, 1, true), 0.018 + 0.021 * 3 * 1.3, 1e-12, "the open swell still draws more");
+});
+
+test("D28: the scoop lands exactly on pitch with no kink, from the full depth below", () => {
+  for (const c of SCOOP_CURVES) {
+    assert.equal(scoopShape(0, c), 1, c);
+    assert.equal(scoopShape(1, c), 0, c);
+    assert.equal(scoopShape(2, c), 0, `${c} stays on pitch after it lands`);
+    for (let x = 0; x < 1; x += .01) assert.ok(scoopShape(x + .01, c) <= scoopShape(x, c) + 1e-12, `${c} only rises toward the note`);
+    near(scoopShape(.995, c), 0, 1e-3, `${c} arrives with zero slope`);
+    const curve = scoopCurve(100, c);
+    near(curve[0], -100, 1e-6, c); assert.equal(curve[curve.length - 1], 0, c);
+  }
+  // an exponential tail (time constant a third of the scoop) is still 5 cents flat
+  // of a 100 cent scoop at the end; these are exactly there
+  near(100 * Math.exp(-3), 5, .1);
+  // the S-curve holds low longer: halfway through, ease-out is a quarter of the way
+  // below and the S-curve halfway
+  near(scoopValue(100, "ease", .5), -25, 1e-9);
+  near(scoopValue(100, "smooth", .5), -50, 1e-9);
+});
+
+test("D28: the scoop lasts at least as long as the reed takes to speak", () => {
+  assert.equal(scoopDuration(.12, .06), .12);
+  assert.equal(scoopDuration(.12, .16), .16);
+});
+
+test("D28: which notes scoop", () => {
+  const base = { depth: 100, m: 72, held: [60, 64, 67], lastTop: 67 };
+  assert.equal(scoopDepth({ ...base, mode: "top" }), 100, "the top voice scoops");
+  assert.equal(scoopDepth({ ...base, mode: "top", m: 62 }), 0, "an inner voice doesn't");
+  assert.equal(scoopDepth({ ...base, mode: "top", held: [] }), 100, "a lone note is the top voice");
+  assert.equal(scoopDepth({ ...base, mode: "top", depth: 0 }), 0, "Off");
+  assert.equal(scoopDepth({ ...base, mode: "leaps" }), 100, "a fourth up is a leap");
+  assert.equal(scoopDepth({ ...base, mode: "leaps", lastTop: 71 }), 0, "a step isn't");
+  assert.equal(scoopDepth({ ...base, mode: "leaps", m: 72 - 0, lastTop: 72 - LEAP }), 100, "a minor third is");
+  assert.equal(scoopDepth({ ...base, mode: "leaps", lastTop: 76 }), 0, "a leap down isn't");
+  assert.equal(scoopDepth({ ...base, mode: "leaps", lastTop: null }), 0, "nothing to leap from");
+  assert.equal(scoopDepth({ ...base, mode: "all", m: 62 }), 100, "every note");
+  assert.equal(scoopDepth({ ...base, mode: "velocity", m: 62, velocity: 127 }), 100);
+  near(scoopDepth({ ...base, mode: "velocity", m: 62, velocity: 64 }), 50.4, .1);
+  assert.ok(isTop(60, [48, 55]) && !isTop(60, [48, 60]));
+});
+
+test("D28: the pitch wheel spans exactly the bend range each way", () => {
+  assert.equal(bendCents(0, 64, 2), 0);
+  near(bendCents(127, 127, 2), 200, 1e-9);
+  near(bendCents(0, 0, 2), -200, 1e-9);
+  near(bendCents(0, 96, 12), 600, 1);
+  assert.equal(bendCents(127, 127, 0), 0);
 });

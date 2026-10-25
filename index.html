@@ -124,6 +124,43 @@
       <p class="sub">The fan stirs the sound after it leaves the reeds, so it only catches the upper harmonics: those above the blade-size frequency. Blade shadow is the flicker as blades pass; Shimmer is the phasing from sound bouncing off the moving blades; Stereo sweep moves those upper harmonics side to side. The fundamentals stay steady. Whole-sound wobble and Lid wobble are the earlier tremolo, which pulses everything; they're off by default.</p>
       </div>
     </details>
+    <details class="vox-panel" id="exprPanel" data-info="expression">
+      <summary class="info-host">Expression</summary>
+      <div class="vox-body">
+      <div class="vox-grid">
+        <div class="field">
+          <div class="field-head"><label for="scoopDepthAmt">Scoop</label><output id="scoopDepthOut" for="scoopDepthAmt">Off</output></div>
+          <input type="range" id="scoopDepthAmt" min="0" max="200" step="5" value="0">
+        </div>
+        <div class="field">
+          <div class="field-head"><label for="scoopTimeAmt">Scoop time</label><output id="scoopTimeOut" for="scoopTimeAmt">120 ms</output></div>
+          <input type="range" id="scoopTimeAmt" min="40" max="300" step="10" value="120">
+        </div>
+        <div class="field">
+          <label for="scoopMode" class="field-label">Scoop on</label>
+          <select id="scoopMode">
+            <option value="top">Top voice</option>
+            <option value="leaps">Top voice, leaps up</option>
+            <option value="all">Every note</option>
+            <option value="velocity">Every note, by velocity</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="scoopCurve" class="field-label">Curve</label>
+          <select id="scoopCurve">
+            <option value="ease">Ease in</option>
+            <option value="smooth">S-curve</option>
+          </select>
+        </div>
+        <div class="field">
+          <div class="field-head"><label for="bendRangeAmt">Bend range</label><output id="bendRangeOut" for="bendRangeAmt">±2 semitones</output></div>
+          <input type="range" id="bendRangeAmt" min="0" max="12" step="1" value="2">
+        </div>
+      </div>
+      <p class="sub">Playing gestures from singing, horns and blues harmonica rather than from the reed organ itself. Scoop starts a note below its pitch and slides up into it, landing exactly in tune at the end of Scoop time (or when the reed reaches full voice, if that's later). Every reed on the key, and its coupled octaves, bends together. Top voice scoops only the highest note you're holding, so a melody bends over a steady chord; leaps up scoops it only when it jumps up a minor third or more; by velocity scoops harder-struck notes deeper (mouse and computer keys count as fairly hard). Ease in moves fastest at first and settles; S-curve holds low a moment, then rises, for a more obvious bend.</p>
+      <p class="sub">A MIDI keyboard's mod wheel sets Scoop, and its pitch wheel bends every sounding note by up to Bend range.</p>
+      </div>
+    </details>
   </section>
 
   <section class="console" aria-label="Playing" data-info="play">
@@ -314,6 +351,7 @@
   <div><h3>Reeds in step</h3><p>Hold one note with Diapason and Melodia. The two ranks pull together and sound as one steady tone. Set Unison pull to Off and the same note swells and fades slowly as the two reeds drift past each other.</p></div>
   <div><h3>Deep notes</h3><p>Draw the Bourdon alone and play the bottom of the keyboard. The case rolls off the deepest fundamentals, so the bass sounds reedy, as on a real organ. Set Cabinet bass to Off for a fuller, deeper bass, and choose Full range to play notes below any reed organ from a MIDI keyboard.</p></div>
   <div><h3>Couplers</h3><p>Draw Sub Octave and hold a chord: the keys an octave down sink with yours, and the bass grows heavy. Every coupled note is another set of reeds drinking wind.</p></div>
+  <div><h3>Scoop into the tune</h3><p>Open Expression and set Scoop to a semitone. Hold a chord in the left hand and play a melody above it: each melody note slides up into pitch and lands dead in tune, while the chord stays put. Try S-curve for a more obvious bend, Top voice, leaps up so only the jumps scoop, or the mod wheel to ride the depth as you play.</p></div>
   <div><h3>Voice your own organ</h3><p>Open Rank voicing under Adjustments. Darken the Diapason, brighten the Principal, or detune a rank a few cents to hear how much a regulator's touch changes the instrument.</p></div>
 </section>
 

@@ -7,7 +7,7 @@ exists. For *why* things are built this way, see [decisions.md](decisions.md).
 
 | Path | What it is |
 | --- | --- |
-| `index.html` | The markup: cabinet with a top bar (name, gauge, Volume/MIDI/All notes off), stop rail with the Rank voicing and Vox Humana fan drawers, the wind status line under the gauge, Knee swell, keyboard, treadle area, Adjustments, notes. Loads `css/organ.css` and `js/main.js`. |
+| `index.html` | The markup: cabinet with a top bar (name, gauge, Volume/MIDI/All notes off), stop rail with the Rank voicing, Vox Humana fan and Expression drawers, the wind status line under the gauge, Knee swell, keyboard, treadle area, Adjustments, notes. Loads `css/organ.css` and `js/main.js`. |
 | `css/organ.css` | All styles. Colour tokens are in the `:root` block at the top. |
 | `js/main.js` | Entry point: calls each module's setup in order (see below). |
 | `js/state.js` | Shared state: `S` (pressure, swell, tone and the saved choices), `stops`, `voices`, `store` (localStorage), `halfOf`. |
@@ -19,7 +19,7 @@ exists. For *why* things are built this way, see [decisions.md](decisions.md).
 | `js/info.js` | The info buttons: `setupInfo()` adds an "i" button to every `[data-info]` section's `.info-host` heading, which shows or hides that section's own `.sub` and `.hint` text (D24). |
 | `js/autoplay.js` | Pedal autoplay: the pattern editor, its saved pattern, and `stepAutoplay()`, which the control loop calls each frame to press and lift the treadles through `gateOn`/`gateOff`. |
 | `js/wind-loop.js` | The per-frame control loop (`frame`), the gauge and readouts. |
-| `js/core/*.js` | Pure maths, with no page or audio access: `ranks.js` (ranks, harmonic recipes, brightness compensation, Celeste), `reeds.js` (per-reed scatter, wind response and Unison pull), `wind.js` (loudness, brightness and pitch against pressure, treadle envelopes), `speech.js` (how a reed speaks: onset time and shape, tone bloom, the tone shelf's position), `fan.js` (the spinning-fan wave), `output.js` (volume, cabinet bass corner, limiter make-up, soft clip), `autoplay.js` (meters, pattern editing and reshaping, which treadle is down at a given time). |
+| `js/core/*.js` | Pure maths, with no page or audio access: `ranks.js` (ranks, harmonic recipes, brightness compensation, Celeste), `reeds.js` (per-reed scatter, wind response and Unison pull), `wind.js` (loudness, brightness and pitch against pressure, treadle envelopes), `speech.js` (how a reed speaks: onset time and shape, tone bloom, the tone shelf's position), `fan.js` (the spinning-fan wave), `expression.js` (the scoop curve and which notes scoop, the pitch wheel's range), `output.js` (volume, cabinet bass corner, limiter make-up, soft clip), `autoplay.js` (meters, pattern editing and reshaping, which treadle is down at a given time). |
 | `tests/*.spec.js` | Playwright tests that play the organ and measure its sound. See `tests/README.md`. |
 | `tests/unit/` | Unit tests for `js/core` (`npm run test:unit`, no browser). |
 | `scripts/check.mjs` | Static checks: page shape, referenced files, module syntax, imports resolve to real exports, element ids, allowed external hosts. |
@@ -96,6 +96,8 @@ Modulators (all audio-rate `AudioParam` connections):
 - `lfoPan` (cosine, started at the same instant as `lfo` so they stay phase-locked) → `lfoRefl` → `refl.delayTime`; → `lfoPanAmt` → `hiPan.pan`.
 - `windPitch` (a `ConstantSource`, in cents) → each reed's own gain → that oscillator's `detune`.
 - `tiltDb` (a `ConstantSource`, in dB) → every reed's tone shelf `gain`, added to the shelf's own onset automation (Tone bloom).
+- `pitchBend` (a `ConstantSource`, in cents, from the MIDI pitch wheel) → every oscillator's `detune` (D28).
+- Each voice's `bend.src` (a `ConstantSource`, in cents) → all five of its oscillators' `detune`: the Expression scoop, a value curve from −depth to exactly 0 (D28).
 
 ## Control loop
 
@@ -124,6 +126,8 @@ immediately. Each oscillator gets:
 - two envelope gains, `g` (which also carries the release) and `on`, each rising with the same time constant, so the onset is (1 − e^(−t/τ))²: S-shaped, slower for lower reeds and lower wind (`speechTime`, `onsetTau` in `core/speech.js`, D16);
 - routing to `buses[halfOf(m)][i]`.
 
+`noteOn(m, expr)` also takes the press's Expression (D28): `{cents, time, curve}`. When `cents > 0` the voice gets one `bend` source, shared by all its oscillators, that starts `cents` below and follows `scoopCurve` to exactly 0 over `scoopDuration(time, rise)`. `press(m, velocity)` decides the scoop once per played key (`expressionFor`: top voice, leaps, velocity, and the chord window that calls `unscoop` on a lower note when a higher one arrives within `CHORD_WINDOW`) and passes the same object to every coupled octave.
+
 `retune()` recomputes `keyTuning` for every sounding voice and updates all ranks' detune and wind gains; it runs on tuning, Celeste, scatter, Unison pull, Drift variation and new-reed changes, and from `applyStops()`, because drawing a stop can lock or unlock reeds. `rewind` is the same function.
 
 Voices are reference-counted (`refs`). Input never calls `noteOn` directly: it
@@ -134,7 +138,7 @@ held keys when a coupler is drawn or retired.
 
 - **Stops** (`stops.bass[id]`, `stops.treble[id]`, `stops.vox`, `stops.sub`, `stops.sup`) are not saved; the organ always opens with Diapason and Melodia drawn.
 - **Settings** are saved in `localStorage` under `reed-<key>` through `store.get` / `store.set`. Most use `bindSlider(id, key, default, format, onChange, map)` in `controls.js`: the input id ends in `Amt`, its `<output>` in `Out`, and `map` turns the slider position into the value the sound uses. Add the result to `ctl` so other modules can read `ctl.name.value`.
-- **Saved choices** that aren't sliders (`S.splitMode`, `S.compass`, `S.easyWind`, `S.directWind`, `S.toneModel`, `S.voxShape`, `S.reedSeed`) are read once in `state.js`.
+- **Saved choices** that aren't sliders (`S.splitMode`, `S.compass`, `S.easyWind`, `S.directWind`, `S.toneModel`, `S.voxShape`, `S.scoopMode`, `S.scoopCurve`, `S.reedSeed`) are read once in `state.js`. `S.wheel` holds the MIDI pitch wheel's last position and isn't saved.
 - **Reed set**: `S.reedSeed` feeds `reedRand(seed, i, m, salt)`, a hash used for each reed's tuning error and wind response.
 
 ## Where features live
@@ -156,7 +160,8 @@ held keys when a coupler is drawn or retired.
 | Direct wind | `wind-loop.js`, `controls.js`, `autoplay.js`, `keys.js`, `state.js` | `S.directWind`, `ctl.directAir`, `#directOn`, `#airAmt`, MIDI CC2 and `S.directCC` (CC7 by default; `#directLearn`, `setDirectCC`) |
 | Easy wind | `core/wind.js`, `wind-loop.js`, `treadles.js`, `state.js` | `windDrain`, `EASY_REEDS`, `S.easyWind`, `#easyWind` |
 | Pedal autoplay | `autoplay.js`, `core/autoplay.js`, `controls.js`, `wind-loop.js` | `stepAutoplay`, `setupAutoplay`, `retime`, `pedalsAt`, `noteAt`, `reshape`, `METERS`, `ctl.tempo`, store key `autoplay` |
-| MIDI | `keys.js` | `connectMidi`, `onMidi` (notes, CC64 sustain, CC11/CC4 swell, CC7 volume or Direct wind, CC2 Direct wind, CC120/123) |
+| MIDI | `keys.js` | `connectMidi`, `onMidi` (notes with velocity, pitch wheel, CC1 Scoop, CC64 sustain, CC11/CC4 swell, CC7 volume or Direct wind, CC2 Direct wind, CC120/123) |
+| Expression (scoop, pitch wheel) | `core/expression.js`, `keys.js`, `audio.js`, `controls.js`, `state.js` | `scoopCurve`, `scoopDepth`, `scoopDuration`, `bendCents`, `CHORD_WINDOW`, `expressionFor`, `press(m, velocity)`, `noteOn(m, expr)`, `unscoop`, `applyBend`, `pitchBend`, `ctl.scoopDepth`, `ctl.scoopTime`, `ctl.bendRange`, `#exprPanel` |
 | All notes off | `keys.js`, `audio.js` | `allNotesOff`, `silenceAll`, `#panicBtn`, Escape; computer keys tracked by `KeyboardEvent.code` (`CODEMAP`, `keyId`) |
 | Compass | `keys.js`, `state.js` | `COMPASS`, `inCompass`, `couplesFor`, `S.compass` |
 | Volume, limiter, cabinet bass | `audio.js`, `core/output.js`, `controls.js` | `applyOutput`, `master`, `MASTER`, `limiterMakeupDb`, `softClipCurve`, `bassCut`, `ctl.volume`, `ctl.bassCut` |

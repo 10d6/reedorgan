@@ -18,7 +18,7 @@ changes the organ's loudness, brightness, pitch and how quickly notes speak.
 | Direct wind | Tick **Direct wind** (top right) and its slider sets the air in the reservoir by itself; treadles, autoplay and playing no longer change it. Your MIDI keyboard's volume knob (CC7) or a breath controller (CC2) moves it; **Learn** binds any other knob. With Direct wind off, the volume knob sets Volume |
 | Stuck note | **All notes off** (top right), or `Esc` |
 | Explanations | Tap the small **i** beside any heading to show or hide what its controls do |
-| MIDI keyboard | Click **Connect MIDI** (top right; it glows orange until a keyboard is listening). Works in Chrome, Edge, Opera and Firefox. Responds to notes, the sustain pedal (CC64), expression (CC11/CC4), volume (CC7), breath (CC2) and all-notes-off |
+| MIDI keyboard | Click **Connect MIDI** (top right; it glows orange until a keyboard is listening). Works in Chrome, Edge, Opera and Firefox. Responds to notes, the pitch wheel, the mod wheel (CC1, sets Scoop), the sustain pedal (CC64), expression (CC11/CC4), volume (CC7), breath (CC2) and all-notes-off |
 
 ## What's in it
 
@@ -80,6 +80,14 @@ changes the organ's loudness, brightness, pitch and how quickly notes speak.
   shifts the balance of upper harmonics against the fundamental, as a real reed
   does, measured from each reed's own pitch so it works the same on every note; *Filter sweep* is the original moving lowpass. Depth, resonance (Q) and
   response time are adjustable.
+- **Expression** (off by default): playing gestures from singing, horns and
+  blues harmonica rather than from the reed organ itself. *Scoop* starts a note
+  up to a whole tone below and slides up into it, landing exactly in tune at
+  the end of *Scoop time*; every reed on the key, and its coupled octaves,
+  bends together. By default only the top voice scoops, so a melody bends over
+  a steady chord; or only on leaps up, every note, or by MIDI velocity. *Ease
+  in* or *S-curve* shapes. The MIDI pitch wheel bends everything by up to
+  *Bend range*, and the mod wheel sets Scoop.
 - **Rank voicing**: a drawer under Adjustments with level, fine tuning (±20
   cents) and brightness for each rank, plus a button to restore the factory
   voicing. Brightness reshapes the rank's harmonics and is level-matched, so it
