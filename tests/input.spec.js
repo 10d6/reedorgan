@@ -1,6 +1,6 @@
 // Playing with the mouse, the computer keyboard, the treadles and a MIDI keyboard.
 import { test, expect } from "@playwright/test";
-import { openOrgan, hold, letGo, keysDown, readout, focusKeys, setSlider, rms, toggleStop } from "./organ.js";
+import { openOrgan, hold, letGo, keysDown, readout, focusKeys, setSlider, rms, toggleStop, savePatch } from "./organ.js";
 
 test("clicking and dragging across keys plays them in turn", async ({ page }) => {
   await openOrgan(page);
@@ -139,6 +139,7 @@ test("Easy wind: a full-organ chord drains like three reeds, and is remembered (
   expect(await readout(page, "rReeds")).toBe("30");             // the reeds still sound
   expect(await readout(page, "rUse")).toBe("0.08/s");           // but use the air of three
   await letGo(page, "z", "b", "q", "e", "t", "i");
+  await savePatch(page);                                       // settings are kept in a saved patch (D33)
   await page.reload();
   await expect(page.locator("#easyWind")).toBeChecked();
 });
@@ -168,6 +169,7 @@ test("Direct wind: the slider alone sets the reservoir; treadles, the sequencer'
   await page.evaluate(() => window.__midi(0xb0, 2, 127));       // breath controller full
   await expect(page.locator("#airOut")).toHaveText("3.6″");
   await letGo(page, "z", "b", "q", "e", "t", "i");
+  await savePatch(page);                                       // settings are kept in a saved patch (D33)
   await page.reload();
   await expect(page.locator("#directOn")).toBeChecked();
   await expect(page.locator("#airOut")).toHaveText("3.6″");

@@ -5,12 +5,13 @@ import { DEFAULT_ENV, TMAX, toTime, toSlider, fmtT } from './core/wind.js';
 import { S, store } from './state.js';
 import { initAudio, thump } from './audio.js';
 import { mix } from './controls.js';
+import { patchField } from './patches.js';
 
 // {side, gate, stage ('idle'|'a'|'d'|'s'|'r'), lvl 0…1 (the foot's envelope),
 //  seq 0…1 (the sequencer's treadle lane, D32), relFrom, boost, p:{a,d,s,r}}
 export const ped = {
-  L: { side: 'L', name: 'Left', gate: false, stage: 'idle', lvl: 0, seq: 0, seqDown: false, relFrom: 0, boost: 1, p: { ...DEFAULT_ENV, ...store.get('envL', {}) } },
-  R: { side: 'R', name: 'Right', gate: false, stage: 'idle', lvl: 0, seq: 0, seqDown: false, relFrom: 0, boost: 1, p: { ...DEFAULT_ENV, ...store.get('envR', {}) } },
+  L: { side: 'L', name: 'Left', gate: false, stage: 'idle', lvl: 0, seq: 0, seqDown: false, relFrom: 0, boost: 1, p: { ...DEFAULT_ENV } },
+  R: { side: 'R', name: 'Right', gate: false, stage: 'idle', lvl: 0, seq: 0, seqDown: false, relFrom: 0, boost: 1, p: { ...DEFAULT_ENV } },
 };
 // How far the pedal is down: the player's foot or the sequencer, whichever is further.
 export const pedalLevel = P => Math.max(P.lvl, P.seq);
@@ -43,8 +44,8 @@ export function seqPedal(P, lvl) {
 }
 
 function setParam(P, k, v) {
-  P.p[k] = v; store.set('env' + P.side, P.p);
-  if (linkEl.checked) { const O = P.side === 'L' ? ped.R : ped.L; O.p[k] = v; store.set('env' + O.side, O.p); syncUI(O); }
+  P.p[k] = v;
+  if (linkEl.checked) { const O = P.side === 'L' ? ped.R : ped.L; O.p[k] = v; syncUI(O); }
   syncUI(P);
 }
 function syncUI(P) {
@@ -113,13 +114,20 @@ function buildFoot(P, feetEl) {
 export function setupTreadles() {
   const easyEl = document.getElementById('easyWind');   // Easy wind (D23)
   easyEl.checked = S.easyWind;
-  easyEl.addEventListener('change', () => { S.easyWind = easyEl.checked; store.set('easyWind', S.easyWind); });
+  easyEl.addEventListener('change', () => { S.easyWind = easyEl.checked; });
   linkEl = document.getElementById('link');
-  linkEl.checked = store.get('link', true);
+  linkEl.checked = true;
   linkEl.addEventListener('change', () => {
-    store.set('link', linkEl.checked);
-    if (linkEl.checked) { ped.R.p = { ...ped.L.p }; store.set('envR', ped.R.p); syncUI(ped.R); }
+    if (linkEl.checked) { ped.R.p = { ...ped.L.p }; syncUI(ped.R); }
   });
   const feetEl = document.getElementById('feet');
   buildFoot(ped.L, feetEl); buildFoot(ped.R, feetEl);
+  // Patches (D33): Easy wind, and each foot's envelope and whether they're linked.
+  const bool = v => typeof v === 'boolean';
+  patchField('easyWind', { def: false, get: () => S.easyWind, set: v => { S.easyWind = v; easyEl.checked = v; }, ok: bool });
+  patchField('link', { def: true, get: () => linkEl.checked, set: v => { linkEl.checked = v; }, ok: bool });
+  const env = v => !!v && typeof v === 'object' && ['a', 'd', 's', 'r'].every(k => v[k] === undefined || typeof v[k] === 'number');
+  for (const P of [ped.L, ped.R]) {
+    patchField('env' + P.side, { def: { ...DEFAULT_ENV }, get: () => ({ ...P.p }), set: v => { P.p = { ...DEFAULT_ENV, ...v }; syncUI(P); }, ok: env });
+  }
 }

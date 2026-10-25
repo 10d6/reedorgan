@@ -4,7 +4,7 @@
 // bloom at zero, so the only pitch movement is the one under test. A scoop is
 // tens of cents; "doesn't scoop" allows a few cents of tracker noise at the onset.
 import { test, expect } from "@playwright/test";
-import { openOrgan, setSlider, toggleStop, pitchTrace, cents, measure } from "./organ.js";
+import { openOrgan, setSlider, toggleStop, pitchTrace, cents, measure, savePatch } from "./organ.js";
 
 const A3 = 57, C5 = 72;
 const on = (m, v = 100) => [0x90, m, v], off = (m) => [0x80, m, 0];
@@ -158,6 +158,7 @@ test("the mod wheel sets Scoop; Expression settings are remembered (D28)", async
   await page.selectOption("#scoopMode", "leaps");
   await page.selectOption("#scoopCurve", "smooth");
   await setSlider(page, "scoopTimeAmt", 180);
+  await savePatch(page);                                       // settings are kept in a saved patch (D33)
   await page.reload();
   await expect(page.locator("#exprPanel")).toHaveAttribute("open", "");
   expect(await page.locator("#scoopMode").inputValue()).toBe("leaps");
@@ -360,6 +361,7 @@ test("vibrato and accent settings are remembered (D29)", async ({ page }) => {
   await page.click("#vibLearn");
   await midi(page, [0xb0, 20, 64]);                                       // binds CC20
   await midi(page, [0xb0, 20, 64]);                                       // and sets the delay to halfway
+  await savePatch(page);                                       // settings are kept in a saved patch (D33)
   await page.reload();
   expect(await page.locator("#scoopMode").inputValue()).toBe("accent");
   expect(await page.locator("#scoopCurve").inputValue()).toBe("snap");

@@ -4,6 +4,7 @@
 import { S, stops, voices, splitNote, store } from './state.js';
 import { initAudio, noteOn, noteOff, silenceAll, unscoop, dropVibrato, applyBend, ctx } from './audio.js';
 import { seqPress, seqReleaseAll } from './modseq.js';
+import { patchField } from './patches.js';
 import { scoopDepth, scoopDuration, isTop, delayFromCC, CHORD_WINDOW, KEY_VELOCITY } from './core/expression.js';
 import { speechTime } from './core/speech.js';
 import { noteFreq } from './core/ranks.js';
@@ -242,6 +243,7 @@ export function setupKeys() {
     if (e.key === 'Escape') { allNotesOff(); return; }
     if (e.metaKey || e.ctrlKey || e.altKey) return;
     const tag = e.target.tagName;
+    if (tag === 'TEXTAREA' || e.target.isContentEditable || (tag === 'INPUT' && !['range', 'checkbox'].includes(e.target.type))) return;   // typing a patch name (D33)
     if (tag === 'INPUT' && (e.key.startsWith('Arrow') || e.key === ' ')) return; // let sliders use arrows
     if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); if (!e.repeat) gateOn(e.key === 'ArrowLeft' ? ped.L : ped.R); return; }
     if (e.key === ' ') {
@@ -268,8 +270,10 @@ export function setupKeys() {
   /* the All notes off button and the keyboard compass */
   document.getElementById('panicBtn').addEventListener('click', () => { allNotesOff(); keysEl.focus?.(); });
   const compassEl = document.getElementById('compass');
+  const setCompass = v => { S.compass = v; compassEl.value = v; recouple(); };
   compassEl.value = S.compass;
-  compassEl.addEventListener('change', () => { S.compass = compassEl.value; store.set('compass', S.compass); recouple(); });
+  compassEl.addEventListener('change', () => setCompass(compassEl.value));
+  patchField('compass', { def: 'full', get: () => S.compass, set: setCompass, ok: v => v in COMPASS });
 
   /* MIDI */
   midiBtn = document.getElementById('midiBtn'); midiStatus = document.getElementById('midiStatus');

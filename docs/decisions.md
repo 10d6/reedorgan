@@ -353,3 +353,52 @@ The Amount readout shows the chosen target's units: "25% · 0.9″", "25% · 2.8
 **Planted bugs:** each of these was caught: the treadles pumping only while keys are held, the treadles pumping under Direct wind, sequencer strokes giving no air, a saved autoplay pattern ignored, bars not keeping their notes when the time changes, and a treadle pattern not turning Direct wind off.
 
 **Supersedes:** D22's pattern editor (beats of Left, Right, Rest, Tie). Its defaults and behaviour live on as the treadle patterns.
+
+## D33. Patches, and no more automatic saving of the sound
+
+**Chosen:** the sound is saved by name, as patches, and nothing about it saves itself any more.
+- **The patch bar** runs across the top bar: a menu of patches, an *edited* mark, and Save, Save as…, Revert, Rename, Delete, Download and Load file….
+- **Factory** is built in, first in the menu, and can't be overwritten, renamed or deleted; Save as… keeps a change to it.
+- **Names** are tidied (single spaces, at most 40 characters). Save as… onto an existing name replaces that patch, and its button says *Replace*. Rename can't land on another patch's name. Delete asks first, then loads Factory.
+- **A patch is the whole sound:** the drawn stops and couplers and the divided-stops setting (new: stops were never saved before), every sound slider (wind, wind tone, reeds, voicing, case and room, the fan, Expression, Direct wind's level, knee swell), and the sound's other choices:
+  - tone model, fan shape, Scoop on, Curve, Vibrato on
+  - Direct wind on or off, keyboard compass, helper pump, Easy wind
+  - each foot's envelope and whether they're linked
+  - the reed set
+  - the whole modulation sequencer (time, bars, Starts on, tempo, every lane)
+- **Loading a patch applies it at once,** to notes already sounding too. Anything a patch doesn't mention gets the factory setting, so patches keep loading as new controls arrive. Each patch records a version (1).
+- **No automatic saving of the sound.** Moving a slider changes the sound but writes nothing. The *edited* mark shows when the sound differs from the patch as loaded or saved (it compares the two four times a second, so stops, sequencer edits and MIDI controls count too); Revert reloads the patch. Which sequencer lane is on show isn't part of the sound and doesn't count.
+- **The organ opens with the patch last loaded or saved** (`reed-patch`), or Factory. Reloading without saving brings back the patch as saved.
+- **Still remembered automatically** (your setup and the page layout): Volume, the MIDI controls learned for Direct wind and Vibrato delay, which drawers are open, which info explanations are showing, and which sequencer pattern is on show.
+- **Files:** Download saves the sound as `<name>.reedorgan.json` (`{app: "parlor-reed-organ", kind: "patch", version, name, settings}`). Load file… adds a patch from one, never overwriting (a taken name becomes "Name (2)"), and loads it. A file that isn't a patch, or comes from a newer version, is refused with a message under the bar.
+- **Settings saved before patches** become a patch called **My settings** the first time this version opens, and it opens with that. This only happens if they differ from the factory sound: since D32 every visit saved the sequencer whether or not anything changed, so nearly every browser has some old settings. A saved Pedal autoplay or early sequencer pattern goes through D32's carry-over. The old entries are then deleted, leaving only your setup, the layout, `reed-patches` and `reed-patch`.
+
+**How:**
+- Every setting that belongs to the sound registers itself with `patchField(key, {def, get, set, ok, legacy})` in its module's setup. `bindSlider` registers every slider (except the setup ones in `RIG`, which is just Volume) under its old storage key, by slider position. The other choices register where they live (`controls.js`, `stops.js`, `keys.js`, `treadles.js`, `modseq.js`).
+- `js/patches.js` keeps the library (`reed-patches`), builds a patch from `snapshot()`, applies one in registration order (the divided-stops setting before the stops), runs the patch bar, and does the carry-over. `setupPatches()` runs after every other module's setup.
+- Names, the library, comparing settings and the file format are pure (`core/patches.js`).
+- The computer keyboard doesn't play notes while you type in a text box.
+
+**Why:** the owner asked to save patches locally and to stop the automatic saving of every setting. They agreed to the suggestions for the open questions:
+- open with the last patch loaded or saved;
+- keep remembering the setup and layout automatically;
+- include the stops;
+- download and load patches as files;
+- show an *edited* mark rather than a "Leave site?" warning;
+- leave ready-made patches for a later PR.
+
+**Tests changed:**
+- Ten tests that changed a sound setting and checked it survived a reload now save a patch first (`savePatch` in `tests/organ.js`), because that's how a setting is kept now. They are the Expression, Easy wind, Direct wind, sequencer and settings tests.
+- The settings test is now "settings come back with their saved patch; open drawers are remembered on their own".
+- The reed-set test checks the reed set goes into the patch and that `reed-reedSeed` is no longer written.
+
+**New tests:** `tests/patches.spec.js` (8 tests) and 4 unit tests. Each of these planted bugs was caught:
+- every slider still saving itself
+- stops left out of patches
+- always opening with Factory
+- old settings not carried over
+- the edited mark never showing
+- typing a name playing notes
+- the lane on show counting as an edit
+
+**Revisit if:** the owner wants ready-made patches shipped alongside Factory, a "Download all" backup, a warning before leaving with unsaved changes, or a patch to switch on a MIDI program change.

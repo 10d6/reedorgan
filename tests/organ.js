@@ -134,6 +134,14 @@ export async function stopPumping(page) {
   }
 }
 
+/** Saves the sound as a patch with Save as… (D33): settings are only kept in a saved patch. */
+export async function savePatch(page, name = "Test") {
+  await page.click("#patchSaveAs");
+  await page.fill("#patchName", name);
+  await page.click("#patchOk");
+  await expect(page.locator("#patchSel")).toHaveValue(name);
+}
+
 /** Moves a slider as if the player dragged it. */
 export async function setSlider(page, id, value) {
   await page.$eval("#" + id, (el, v) => { el.value = v; el.dispatchEvent(new Event("input", { bubbles: true })); }, value);

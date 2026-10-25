@@ -24,7 +24,7 @@ work in the repo.
 ## Conventions
 
 - Colours are tokens in the `:root` block of `css/organ.css`. The design is deliberately single-theme (dark walnut cabinet).
-- New sliders go in `setupControls()` in `js/controls.js` as `ctl.name = bindSlider(id, storeKey, default, format, onChange, map)`. The input id ends in `Amt` and its `<output>` ends in `Out`. Settings persist through `store`.
+- New sliders go in `setupControls()` in `js/controls.js` as `ctl.name = bindSlider(id, key, default, format, onChange, map)`. The input id ends in `Amt` and its `<output>` ends in `Out`. A slider is part of patches automatically (D33); a new setting that isn't a slider must register with `patchField()` from `js/patches.js` in its module's setup, or it won't be saved. Only your setup and the page layout (Volume, learned MIDI controls, open drawers, info) save themselves through `store`.
 - Input calls `press(m)` / `release(m)`, never `noteOn` / `noteOff` directly.
 - Keep the "Things to listen for" notes in step with features.
 - PR descriptions say what the player hears or does differently, include measurements, and end with "Try after merging". Write them for a reader who won't look at the code.

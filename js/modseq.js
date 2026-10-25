@@ -17,14 +17,14 @@ import { S, stops, store } from './state.js';
 import { ctx } from './audio.js';
 import { ctl, setDirectWind } from './controls.js';
 import { drawVox } from './stops.js';
+import { patchField } from './patches.js';
 
 let P = normaliseSeq();       // meter, bars, trigger, edit (the lane on show), lanes {on, amount, notes}
 let t0 = null;                // when the key-driven lanes' pass started (seconds), or null when stopped
 let free0 = null;             // when the treadle lanes started (seconds), or null while they rest
 let lastTempo = 100, sel = -1; // the selected note's index in the lane on show, or −1
-let gridEl, laneEl, playEl, onEl, amountEl, amountOut, tabsEl;
+let gridEl, laneEl, playEl, onEl, amountEl, amountOut, tabsEl, meterEl, barsEl, trigEl;
 
-const save = () => store.set('seq', P);
 const now = () => performance.now() / 1000;
 const lane = () => P.lanes[P.edit];
 const steps = () => seqSteps(P.meter, P.bars);
@@ -110,7 +110,7 @@ function select(k, focus = true) {
   gridEl.querySelectorAll('.seq-note').forEach(el => el.classList.toggle('selected', +el.dataset.i === k));
   const el = gridEl.querySelector(`.seq-note[data-i="${k}"]`); if (el && focus) el.focus();
 }
-function edit({ notes, index }) { lane().notes = notes; save(); render(); if (index >= 0) select(index); }
+function edit({ notes, index }) { lane().notes = notes; render(); if (index >= 0) select(index); }
 
 // Stretching a note by dragging either end. The note is updated in place while
 // dragging (re-drawing would lose the pointer), and saved when it's let go.
@@ -124,7 +124,7 @@ function startDrag(e, handle) {
     lane().notes = resizeNote(lane().notes, k, edge, to, n).notes;
     el.style.cssText = noteStyle(lane().notes[k]); el.setAttribute('aria-label', noteLabel(lane().notes[k]));
   };
-  const up = () => { handle.removeEventListener('pointermove', move); handle.removeEventListener('pointerup', up); handle.removeEventListener('pointercancel', up); save(); render(); select(k); };
+  const up = () => { handle.removeEventListener('pointermove', move); handle.removeEventListener('pointerup', up); handle.removeEventListener('pointercancel', up); render(); select(k); };
   handle.addEventListener('pointermove', move); handle.addEventListener('pointerup', up); handle.addEventListener('pointercancel', up);
 }
 
@@ -137,7 +137,7 @@ function onKey(e) {
   const k = +el.dataset.i, x = lane().notes[k], n = steps();
   if (e.key === 'Backspace' || e.key === 'Delete') {
     e.preventDefault(); e.stopPropagation();
-    lane().notes = removeNote(lane().notes, k); sel = -1; save(); render();
+    lane().notes = removeNote(lane().notes, k); sel = -1; render();
     gridEl.querySelector(`.seq-cell[data-row="${x.row}"][data-step="${x.start}"]`)?.focus();
     return;
   }
@@ -194,25 +194,24 @@ export function seqRetime() {
 }
 
 export function setupModSeq() {
-  const saved = store.get('seq', null);
-  P = saved ? normaliseSeq(saved)
-    : migrateSaved({ autoplay: store.get('autoplay', null), modseq: store.get('modseq', null), amount: store.get('seqAmount', null) });
+  // which pattern is on show is page layout, remembered on its own (D33)
+  P = normaliseSeq({ edit: store.get('seqLane', 'left') });
   lastTempo = ctl.tempo.value;
   gridEl = document.getElementById('seqGrid'); onEl = document.getElementById('seqOn'); tabsEl = document.getElementById('seqLanes');
   amountEl = document.getElementById('seqAmountAmt'); amountOut = document.getElementById('seqAmountOut');
-  const meterEl = document.getElementById('seqMeter'), barsEl = document.getElementById('seqBars'), trigEl = document.getElementById('seqTrigger');
+  meterEl = document.getElementById('seqMeter'); barsEl = document.getElementById('seqBars'); trigEl = document.getElementById('seqTrigger');
   meterEl.innerHTML = Object.keys(METERS).map(k => `<option value="${k}">${k}</option>`).join('');
   barsEl.innerHTML = Array.from({ length: MAX_BARS }, (_, i) => `<option value="${i + 1}">${i + 1} bar${i ? 's' : ''}</option>`).join('');
   tabsEl.innerHTML = SEQ_TARGETS.map(id => `<button type="button" role="tab" class="seq-tab" data-lane="${id}"><span class="lamp" aria-hidden="true"></span>${LANE_NAMES[id]}</button>`).join('');
   meterEl.value = P.meter; barsEl.value = String(P.bars); trigEl.value = P.trigger;
-  tabsEl.addEventListener('click', e => { const b = e.target.closest('.seq-tab'); if (!b) return; P.edit = b.dataset.lane; sel = -1; save(); render(); });
+  tabsEl.addEventListener('click', e => { const b = e.target.closest('.seq-tab'); if (!b) return; P.edit = b.dataset.lane; store.set('seqLane', P.edit); sel = -1; render(); });
   // Turning a lane on turns on what it moves (D31, D32).
-  onEl.addEventListener('change', () => { lane().on = onEl.checked; save(); if (lane().on) TARGETS[P.edit].enable(); renderTabs(); });
-  amountEl.addEventListener('input', () => { lane().amount = +amountEl.value / 100; save(); amountOut.textContent = amountText(P.edit, +amountEl.value); });
-  const reshapeTo = () => { P = reshape(P, meterEl.value, +barsEl.value); sel = -1; save(); render(); };
+  onEl.addEventListener('change', () => { lane().on = onEl.checked; if (lane().on) TARGETS[P.edit].enable(); renderTabs(); });
+  amountEl.addEventListener('input', () => { lane().amount = +amountEl.value / 100; amountOut.textContent = amountText(P.edit, +amountEl.value); });
+  const reshapeTo = () => { P = reshape(P, meterEl.value, +barsEl.value); sel = -1; render(); };
   meterEl.addEventListener('change', reshapeTo); barsEl.addEventListener('change', reshapeTo);
-  trigEl.addEventListener('change', () => { P.trigger = trigEl.value; save(); });
-  document.getElementById('seqClear').addEventListener('click', () => { lane().notes = []; sel = -1; save(); render(); });
+  trigEl.addEventListener('change', () => { P.trigger = trigEl.value; });
+  document.getElementById('seqClear').addEventListener('click', () => { lane().notes = []; sel = -1; render(); });
   gridEl.addEventListener('pointerdown', e => { const h = e.target.closest('.seq-handle'); if (h) startDrag(e, h); });
   gridEl.addEventListener('click', e => {
     const note = e.target.closest('.seq-note');
@@ -222,6 +221,25 @@ export function setupModSeq() {
   });
   gridEl.addEventListener('focusin', e => { const note = e.target.closest('.seq-note'); if (note && +note.dataset.i !== sel) select(+note.dataset.i, false); });
   gridEl.addEventListener('keydown', onKey);
-  if (!saved) save();
   render();
+  // Patches (D33) hold the whole sequencer: time, bars, Starts on and every
+  // lane. Which lane is on show isn't part of the sound, so it's left out and
+  // kept as it is when a patch loads. Before patches, it was saved under
+  // reed-seq, or as Pedal autoplay and the first sequencer's settings.
+  patchField('seq', {
+    def: (({ edit, ...rest }) => rest)(normaliseSeq()),
+    get: () => { const { edit, ...rest } = P; return rest; },
+    set: v => {
+      P = normaliseSeq({ ...v, edit: P.edit }); sel = -1;
+      meterEl.value = P.meter; barsEl.value = String(P.bars); trigEl.value = P.trigger;
+      render();
+    },
+    ok: v => !!v && typeof v === 'object' && !Array.isArray(v),
+    legacy: () => {
+      const seq = store.get('seq', null), autoplay = store.get('autoplay', null), modseq = store.get('modseq', null);
+      if (seq) return seq;
+      if (autoplay || modseq) return migrateSaved({ autoplay, modseq, amount: store.get('seqAmount', null) });
+      return undefined;
+    },
+  });
 }

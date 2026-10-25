@@ -4,7 +4,7 @@
 // The wind is read from the gauge's needle every frame (window.__gaugeTrace in
 // organ.js). Patterns run at 120 bpm, so one bar is 2 s and a 16th is 125 ms.
 import { test, expect } from "@playwright/test";
-import { openOrgan, setSlider, gaugeTrace, readout, toggleStop, rms, db, hold, letGo, stopPumping } from "./organ.js";
+import { openOrgan, setSlider, gaugeTrace, readout, toggleStop, rms, db, hold, letGo, stopPumping, savePatch } from "./organ.js";
 
 const A3 = 57, C4 = 60;
 const on = (m) => [0x90, m, 100], off = (m) => [0x80, m, 0];
@@ -48,6 +48,7 @@ test("turning on the Direct wind pattern turns Direct wind on; turning on a trea
   await page.check("#seqOn");
   await expect(page.locator("#directOn")).toBeChecked();
   await expect(page.locator("#airAmt")).toBeEnabled();
+  await savePatch(page);                                       // settings are kept in a saved patch (D33)
   await page.reload();
   await showLane(page, "direct");
   await expect(page.locator("#seqOn")).toBeChecked();
@@ -147,6 +148,7 @@ test("the piano roll: place, replace, stretch, shorten, delete, clear and length
   expect(await notes(page)).toHaveLength(2);
   await page.selectOption("#seqBars", "1");
   expect(await notes(page)).toEqual(["Sweep up, S-curve, 4 sixteenths from bar 1, beat 4, 16th 1"]);
+  await savePatch(page);                                       // settings are kept in a saved patch (D33)
   await page.reload();
   expect(await notes(page)).toEqual(["Sweep up, S-curve, 4 sixteenths from bar 1, beat 4, 16th 1"]);
 });
@@ -200,6 +202,7 @@ test("turning on the fan pattern draws the Vox Humana; the swell needs nothing (
   await playLane(page, "swell");
   await expect(page.locator("#seqAmountOut")).toHaveText("25% of the swell");
   await expect(page.locator("#directOn")).not.toBeChecked();
+  await savePatch(page);                                       // settings are kept in a saved patch (D33)
   await page.reload();
   await showLane(page, "fan");
   await expect(page.locator("#seqOn")).toBeChecked();
@@ -336,6 +339,7 @@ test("time signatures and bars: the grid follows them, and each bar keeps its no
   await page.selectOption("#seqBars", "1");                   // one bar keeps what fits
   expect(await notes(page)).toHaveLength(2);
   expect(await page.locator("#seqGrid .seq-cell").count()).toBe(8 * 12);
+  await savePatch(page);                                       // settings are kept in a saved patch (D33)
   await page.reload();
   expect(await page.locator("#seqMeter").inputValue()).toBe("6/8");
   expect(await page.locator("#seqBars").inputValue()).toBe("1");

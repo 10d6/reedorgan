@@ -58,6 +58,31 @@
       </div>
       <p class="midi-status" id="midiStatus">Not connected</p>
     </div>
+    <div class="patchbar" data-info="patches">
+      <div class="patch-row">
+        <label for="patchSel" class="patch-label info-host">Patch</label>
+        <select id="patchSel"></select>
+        <span class="patch-edited" id="patchEdited" hidden>edited</span>
+        <div class="patch-btns">
+          <button class="btn btn-small" id="patchSave" type="button">Save</button>
+          <button class="btn btn-small" id="patchSaveAs" type="button">Save as…</button>
+          <button class="btn btn-small" id="patchRevert" type="button" disabled>Revert</button>
+          <button class="btn btn-small" id="patchRename" type="button">Rename</button>
+          <button class="btn btn-small" id="patchDelete" type="button">Delete</button>
+          <button class="btn btn-small" id="patchDownload" type="button">Download</button>
+          <button class="btn btn-small" id="patchLoadFile" type="button">Load file…</button>
+          <input type="file" id="patchFile" accept=".json,application/json" hidden>
+        </div>
+      </div>
+      <form class="patch-ask" id="patchAsk" hidden>
+        <label for="patchName" id="patchAskLabel">Save as</label>
+        <input type="text" id="patchName" maxlength="40" autocomplete="off" spellcheck="false">
+        <button class="btn btn-small" id="patchOk" type="submit">Save</button>
+        <button class="btn btn-small" id="patchCancel" type="button">Cancel</button>
+      </form>
+      <p class="patch-msg" id="patchMsg" role="status" aria-live="polite"></p>
+      <p class="sub">A patch is the whole sound: the stops and couplers, the voicing, the wind and reeds, the case and room, the fan, Expression and the sequencer. Changes aren't kept until you save them: <em>edited</em> shows there's something unsaved, and Revert goes back to the patch as saved. The organ opens with the patch you last loaded or saved. Factory is the organ as it comes and can't be overwritten; use Save as… to keep a change to it. Patches are kept in this browser; Download saves one as a file, to back it up or move it to another device, and Load file… brings one back. Volume, the learned MIDI controls and which panels are open are remembered on their own.</p>
+    </div>
   </header>
 
   <section class="rail" aria-label="Stops">
@@ -415,6 +440,7 @@
   <div><h3>Scoop into the tune</h3><p>Open Expression and set Scoop to a semitone. Hold a chord in the left hand and play a melody above it: each melody note slides up into pitch and lands dead in tune, while the chord stays put. Try S-curve for a more obvious bend, Top voice, leaps up so only the jumps scoop, or the mod wheel to ride the depth as you play.</p></div>
   <div><h3>Let long notes sing</h3><p>Open Expression and set Vibrato to about ±30 ¢. Play a quick run, then hold the last note: the run stays plain and the held note settles, then blooms into vibrato. Add a semitone of Scoop and the vibrato waits for each note to land first. Natural variation keeps it from sounding like a machine; Voice colour makes the tone shimmer with it. Set Delay to Never and Learn a knob or pedal to bring the vibrato in yourself.</p></div>
   <div><h3>Let the pattern breathe</h3><p>In the modulation sequencer, pick Knee swell and tick Play this pattern. Hold a chord: the lid opens and closes every bar, in time with the treadles. Tap squares to add sweeps of your own, drag their ends to stretch them, and raise Amount for deeper swells. Set Starts on to Each note for a swell that restarts with every chord. Fan speed makes the Vox Humana race and slow in time; Direct wind takes over the air from the treadles and swells it.</p></div>
+  <div><h3>Keep a sound</h3><p>Draw the stops you like, shape the fan or the sequencer, then press Save as… in the Patch bar and give it a name. Switch between your patches and Factory while holding a chord: the whole sound changes at once. Next time you open the organ it starts with the patch you last used; Download keeps a copy as a file.</p></div>
   <div><h3>Voice your own organ</h3><p>Open Rank voicing under Adjustments. Darken the Diapason, brighten the Principal, or detune a rank a few cents to hear how much a regulator's touch changes the instrument.</p></div>
 </section>
 

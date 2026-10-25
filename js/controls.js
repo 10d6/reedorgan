@@ -5,8 +5,9 @@ import { RANKS } from './core/ranks.js';
 import { seqRetime } from './modseq.js';
 import { HELPER_MAX, GMAX } from './core/wind.js';
 import { volumeGain, bassCutHz } from './core/output.js';
-import { VIB_DELAY_MAX } from './core/expression.js';
+import { VIB_DELAY_MAX, SCOOP_MODES, SCOOP_CURVES, VIB_MODES } from './core/expression.js';
 import { S, store } from './state.js';
+import { patchField } from './patches.js';
 import { initAudio, applyStops, applyVox, applyMix, applyOutput, applyBend, applyVibrato, setFanShape, retune, rewind, revoice, updateComp, ctx } from './audio.js';
 
 // Filled in by setupControls(). Each slider is {el, value, set(v)}; `value` is
@@ -15,18 +16,26 @@ export const ctl = {};
 // Turns Direct wind on or off, as its switch does (the sequencer turns it on, D30).
 export let setDirectWind = () => {};
 // Cabinet, room and treadle-noise levels in percent.
-export const mix = { cab: store.get('cab', 45), room: store.get('room', 30), thump: store.get('thump', 30) };   // treadle noise 30% since D25
+export const mix = { cab: 45, room: 30, thump: 30 };   // treadle noise 30% since D25
 
-/* Sliders that save themselves: fmt turns the slider value into its readout,
-   map turns it into the value the sound uses. The input id ends in Amt and its
-   <output> in Out. */
+// Settings remembered automatically, because they're about your setup rather
+// than the sound (D33). Every other slider belongs to patches.
+const RIG = new Set(['volume']);
+const num = v => typeof v === 'number' && isFinite(v);
+const oneOf = list => v => list.includes(v);
+
+/* Sliders: fmt turns the slider value into its readout, map turns it into the
+   value the sound uses. The input id ends in Amt and its <output> in Out. Each
+   one is a patch setting under `key` (its slider position), except the setup
+   ones in RIG, which save themselves. */
 export function bindSlider(id, key, def, fmt, onChange, map = v => v) {
   const el = document.getElementById(id), out = document.getElementById(id.replace('Amt', 'Out'));
-  const s = { el, value: map(def) };
+  const s = { el, value: map(def) }, rig = RIG.has(key);
   const show = () => { s.value = map(+el.value); out.textContent = fmt(+el.value, s.value); };
-  s.set = (v, save = true) => { el.value = v; show(); if (save) store.set(key, +el.value); if (onChange) onChange(s.value); };
-  el.value = store.get(key, def); show();
-  el.addEventListener('input', () => { initAudio(); show(); store.set(key, +el.value); if (onChange) onChange(s.value); });
+  s.set = v => { el.value = v; show(); if (rig) store.set(key, +el.value); if (onChange) onChange(s.value); };
+  el.value = rig ? store.get(key, def) : def; show();
+  el.addEventListener('input', () => { initAudio(); show(); if (rig) store.set(key, +el.value); if (onChange) onChange(s.value); });
+  if (!rig) patchField(key, { def, get: () => +el.value, set: v => s.set(v), ok: num });
   return s;
 }
 export const logMap = (lo, hi) => v => lo * Math.pow(hi / lo, v / 100);
@@ -55,7 +64,8 @@ export function setupControls() {
   ctl.directAir = bindSlider('airAmt', 'directAir', 20, v => (v / 10).toFixed(1) + '″', null, v => v / 10 / (GMAX * .9));
   const directEl = $('directOn');
   const syncDirect = () => { directEl.checked = S.directWind; ctl.directAir.el.disabled = !S.directWind; };
-  setDirectWind = on => { S.directWind = on; store.set('directWind', on); syncDirect(); };
+  setDirectWind = on => { S.directWind = on; syncDirect(); };
+  patchField('directWind', { def: false, get: () => S.directWind, set: v => setDirectWind(v), ok: v => typeof v === 'boolean' });
   directEl.addEventListener('change', () => { initAudio(); setDirectWind(directEl.checked); });
   syncDirect();
   ctl.swell = bindSlider('swellAmt', 'swell', 0, v => v === 0 ? 'Closed' : v === 100 ? 'Full' : v + '%', null, v => v / 100);
@@ -65,10 +75,10 @@ export function setupControls() {
 
   /* ---- wind tone ---- */
   const toneModelEl = $('toneModel'), toneModelSub = $('toneModelSub');
-  toneModelEl.value = S.toneModel; toneModelSub.textContent = TONE_MODELS[S.toneModel];
-  toneModelEl.addEventListener('change', () => {
-    S.toneModel = toneModelEl.value; store.set('toneModel', S.toneModel); toneModelSub.textContent = TONE_MODELS[S.toneModel];
-  });
+  const setToneModel = v => { S.toneModel = v; toneModelEl.value = v; toneModelSub.textContent = TONE_MODELS[v]; };
+  setToneModel(S.toneModel);
+  toneModelEl.addEventListener('change', () => setToneModel(toneModelEl.value));
+  patchField('toneModel', { def: 'tilt', get: () => S.toneModel, set: setToneModel, ok: oneOf(Object.keys(TONE_MODELS)) });
   ctl.toneDepth = bindSlider('toneDepthAmt', 'toneDepth', 60, v => v === 0 ? 'None' : v + '%', null, v => v / 100);
   ctl.toneQ = bindSlider('toneQAmt', 'toneQ', 12, (_, q) => 'Q ' + q.toFixed(2), null, logMap(.5, 8));
   ctl.toneResp = bindSlider('toneRespAmt', 'toneResponse', 55, (_, t) => t < .1 ? Math.round(t * 1000) + ' ms' : t < 1 ? Math.round(t * 100) * 10 + ' ms' : t.toFixed(1) + ' s', null, logMap(.02, 2));
@@ -82,9 +92,10 @@ export function setupControls() {
   ctl.scoop = bindSlider('scoopAmt', 'scoop', 5, v => v === 0 ? 'None' : v + ' ¢');
   ctl.scatter = bindSlider('scatterAmt', 'reedScatter', 1, v => v === 0 ? 'Perfect' : '±' + v.toFixed(1) + ' ¢', () => retune());
   $('newReeds').addEventListener('click', () => {
-    S.reedSeed = (S.reedSeed % 100000) + 1 + Math.floor(Math.random() * 997); store.set('reedSeed', S.reedSeed);
+    S.reedSeed = (S.reedSeed % 100000) + 1 + Math.floor(Math.random() * 997);
     retune();
   });
+  patchField('reedSeed', { def: 1, get: () => S.reedSeed, set: v => { S.reedSeed = v; retune(); }, ok: v => Number.isInteger(v) && v > 0 });
   ctl.pull = bindSlider('pullAmt', 'unisonPull', 3, v => v === 0 ? 'Off' : v.toFixed(1) + ' ¢', () => retune());
   ctl.beat = bindSlider('beatAmt', 'celesteBeat', 1.5, v => v.toFixed(1) + ' /s', () => retune());
   ctl.breath = bindSlider('breathAmt', 'breath', 100, v => v === 0 ? 'Off' : v + '%', null, v => v / 100);
@@ -126,27 +137,26 @@ export function setupControls() {
 
   /* ---- cabinet, room and treadle noise ---- */
   [['cab', 'cabAmt', 'cabOut'], ['room', 'roomAmt', 'roomOut'], ['thump', 'thumpAmt', 'thumpOut']].forEach(([k, id, oid]) => {
-    const el = $(id), out = $(oid);
-    el.value = mix[k]; out.textContent = mix[k] === 0 ? 'Off' : mix[k] + '%';
-    el.addEventListener('input', () => {
-      mix[k] = +el.value; out.textContent = mix[k] === 0 ? 'Off' : mix[k] + '%';
-      store.set(k, mix[k]); applyMix();
-    });
+    const el = $(id), out = $(oid), def = mix[k];
+    const set = v => { mix[k] = v; el.value = v; out.textContent = v === 0 ? 'Off' : v + '%'; applyMix(); };
+    set(def);
+    el.addEventListener('input', () => set(+el.value));
+    patchField(k, { def, get: () => mix[k], set, ok: num });
   });
 
   /* ---- Vox Humana fan ---- */
   const voxEl = $('voxRate'), voxOut = $('voxOut');
-  voxEl.value = store.get('voxRate', 9);   // D25 defaults: 9 Hz, shadow 50%, shimmer 10%
+  voxEl.value = 9;   // D25 defaults: 9 Hz, shadow 50%, shimmer 10%
   const syncVox = () => { voxOut.textContent = (+voxEl.value).toFixed(1) + ' Hz'; };
-  voxEl.addEventListener('input', () => { initAudio(); syncVox(); store.set('voxRate', +voxEl.value); applyVox(); });
+  voxEl.addEventListener('input', () => { initAudio(); syncVox(); applyVox(); });
   syncVox();
+  patchField('voxRate', { def: 9, get: () => +voxEl.value, set: v => { voxEl.value = v; syncVox(); applyVox(); }, ok: num });
   ctl.voxRate = () => +voxEl.value;           // blade passes per second
   const voxShapeEl = $('voxShape'), voxSub = $('voxSub');
+  const setVoxShape = v => { S.voxShape = v; voxShapeEl.value = v; voxSub.textContent = VOX_SHAPES[v]; if (ctx) setFanShape(); applyVox(); };
   voxShapeEl.value = S.voxShape; voxSub.textContent = VOX_SHAPES[S.voxShape];
-  voxShapeEl.addEventListener('change', () => {
-    initAudio(); S.voxShape = voxShapeEl.value; store.set('voxShape', S.voxShape); voxSub.textContent = VOX_SHAPES[S.voxShape];
-    if (ctx) setFanShape(); applyVox();
-  });
+  voxShapeEl.addEventListener('change', () => { initAudio(); setVoxShape(voxShapeEl.value); });
+  patchField('voxShape', { def: 'sine', get: () => S.voxShape, set: setVoxShape, ok: oneOf(Object.keys(VOX_SHAPES)) });
   // bigger blades reach further down the spectrum: 4 kHz (small) to 600 Hz (large)
   ctl.voxBlade = bindSlider('voxBladeAmt', 'voxBlade', 52, (_, f) => 'above ' + fmtHz(f), () => applyVox(), logMap(4000, 600));
   ctl.voxShadow = bindSlider('voxShadowAmt', 'voxShadow', 50, v => v === 0 ? 'None' : v + '%', () => applyVox(), v => v / 100);
@@ -170,9 +180,11 @@ export function setupControls() {
   ctl.vibFade = bindSlider('vibFadeAmt', 'vibFade', 500, v => v === 0 ? 'At once' : fmtMs(v), () => applyVibrato(), v => v / 1000);
   ctl.vibNatural = bindSlider('vibNaturalAmt', 'vibNatural', 50, v => v === 0 ? 'Off' : v + '%', () => applyVibrato(), v => v / 100);
   ctl.vibColour = bindSlider('vibColourAmt', 'vibColour', 30, v => v === 0 ? 'Off' : v + '%', () => applyVibrato(), v => v / 100);
-  [['scoopMode', 'scoopMode'], ['scoopCurve', 'scoopCurve'], ['vibMode', 'vibMode']].forEach(([id, key]) => {
-    const el = $(id); el.value = S[key];
-    el.addEventListener('change', () => { S[key] = el.value; store.set(key, S[key]); syncCross(); });
+  [['scoopMode', SCOOP_MODES], ['scoopCurve', SCOOP_CURVES], ['vibMode', VIB_MODES]].forEach(([key, list]) => {
+    const el = $(key), set = v => { S[key] = v; el.value = v; syncCross(); };
+    el.value = S[key];
+    el.addEventListener('change', () => set(el.value));
+    patchField(key, { def: S[key], get: () => S[key], set, ok: oneOf(list) });
   });
   syncCross();
   const exprPanel = $('exprPanel');
@@ -184,9 +196,10 @@ export function setupControls() {
 
   /* ---- helper pump ---- */
   const helperEl = $('helper'), helperOut = $('helperOut');
-  helperEl.value = store.get('helper', 2);   // 2% since D22: a trickle, so the sequencer's treadles do most of the work
+  helperEl.value = 2;   // 2% since D22: a trickle, so the sequencer's treadles do most of the work
   const syncHelper = () => { const v = +helperEl.value; helperOut.textContent = v === 0 ? 'Off' : v + '% · ' + (v / 100 * HELPER_MAX).toFixed(2) + '/s'; };
-  helperEl.addEventListener('input', () => { initAudio(); store.set('helper', +helperEl.value); syncHelper(); });
+  helperEl.addEventListener('input', () => { initAudio(); syncHelper(); });
   syncHelper();
+  patchField('helper', { def: 2, get: () => +helperEl.value, set: v => { helperEl.value = v; syncHelper(); }, ok: num });
   ctl.helperRate = () => +helperEl.value / 100 * HELPER_MAX;   // reservoir units per second
 }
