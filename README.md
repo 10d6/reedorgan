@@ -11,11 +11,11 @@ changes the organ's loudness, brightness, pitch and how quickly notes speak.
 | What | How |
 | --- | --- |
 | Play notes | Click or touch the keys, or use the computer keyboard: `Z`–`M` for the low octave, `Q`–`U` and up for the middle |
-| Pump | **Pedal autoplay** pumps for you from the first note (on by default). Or hold the Left and Right treadles, or hold `←` `→` (alternating fills fastest). `Space` pumps the next foot |
-| Steady wind | Tick **Easy wind** (in Treadles) so chords and extra stops use no more air than three notes. Or speed up or busy the autoplay rhythm, or raise **Helper pump** under Adjustments (2% by default). If you play more than the wind supplies, it slowly runs out |
+| Pump | The **modulation sequencer**'s treadle patterns pump for you from the first touch (on by default). Or hold the Left and Right treadles, or hold `←` `→` (alternating fills fastest). `Space` pumps the next foot |
+| Steady wind | Tick **Easy wind** (in Treadles) so chords and extra stops use no more air than three notes. Or raise the sequencer's tempo or add treadle strokes, or raise **Helper pump** under Adjustments (2% by default). If you play more than the wind supplies, it slowly runs out |
 | Swell | Move the **Knee swell** slider, or use a MIDI expression pedal (CC11 or CC4) |
 | Volume | The **Volume** slider. Above 100% a limiter keeps loud chords clean |
-| Direct wind | Tick **Direct wind** (top right) and its slider sets the air in the reservoir by itself; treadles, autoplay and playing no longer change it. Your MIDI keyboard's volume knob (CC7) or a breath controller (CC2) moves it; **Learn** binds any other knob. With Direct wind off, the volume knob sets Volume |
+| Direct wind | Tick **Direct wind** (top right) and its slider sets the air in the reservoir by itself; the treadles (yours or the sequencer's) and playing no longer change it. Your MIDI keyboard's volume knob (CC7) or a breath controller (CC2) moves it; **Learn** binds any other knob. With Direct wind off, the volume knob sets Volume |
 | Stuck note | **All notes off** (top right), or `Esc` |
 | Explanations | Tap the small **i** beside any heading to show or hide what its controls do |
 | MIDI keyboard | Click **Connect MIDI** (top right; it glows orange until a keyboard is listening). Works in Chrome, Edge, Opera and Firefox. Responds to notes, the pitch wheel, the mod wheel (CC1, sets Scoop), the sustain pedal (CC64), expression (CC11/CC4), volume (CC7), breath (CC2) and all-notes-off |
@@ -50,11 +50,6 @@ changes the organ's loudness, brightness, pitch and how quickly notes speak.
   reedy rather than booming. Turn it down or Off for a deeper bass.
 - **Keyboard compass**: Full range (every MIDI note, A0 to C8) or a real reed
   organ's 61 keys, F to F, where couplers fall silent past the ends.
-- **Pedal autoplay**: works the treadles in a looping rhythm you set: 1 to 4
-  measures in 2/4, 3/4, 4/4, 5/4 or 6/8, a tempo from 30 to 200 bpm, and each
-  beat a Left or Right stroke, a rest, or a tie that holds the stroke longer.
-  The default is one bar of 4/4 at 100 bpm: right, left, half-note rest. That
-  carries a melody or a three-note chord; fuller playing needs a busier rhythm.
 - **Easy wind**: the bellows charge for no more than three notes on one stop,
   so full chords and stop changes don't need harder pumping. The sound is the
   same; off by default.
@@ -95,14 +90,22 @@ changes the organ's loudness, brightness, pitch and how quickly notes speak.
   (*Learn*), so pushing a controller up brings vibrato in on a held note. The
   MIDI pitch wheel bends everything by up to *Bend range*, and the mod wheel
   sets Scoop.
-- **Modulation sequencer** (off by default): a piano roll that moves Direct
-  wind, the Vox Humana fan's speed or the knee swell in time with the tempo. Rows are sweep shapes, up or down along Linear,
-  Slow start, Fast start or S-curve; columns are 16th notes over one or two
-  bars. Tap to place a shape, drag its ends to stretch it, Backspace to remove
-  it. Each note moves the wind by *Amount* from wherever the last one left it,
-  stopping at the ends of the gauge. The pattern starts on the first note of a
-  phrase (or on each note) and loops while you hold keys. Turning it on turns
-  on what it moves: Direct wind, or the Vox Humana stop.
+- **Modulation sequencer**: piano rolls that move the treadles, Direct wind,
+  the Vox Humana fan's speed and the knee swell in time, one pattern for each,
+  all playing together. Rows are sweep shapes, up or down along Linear, Slow
+  start, Fast start or S-curve; columns are 16th notes over 1 to 4 bars of
+  2/4, 3/4, 4/4, 5/4 or 6/8, at a tempo from 30 to 200 bpm. Tap to place a
+  shape, drag its ends to stretch it, Backspace to remove it. Each note moves
+  its control by that pattern's *Amount* from wherever the last one left it,
+  stopping at the ends of its range.
+  - **The treadle patterns pump the organ** (on by default): a sweep up presses
+    the pedal, a sweep down lets it up. They start with the first touch and
+    keep going, like a player's feet; the default is one bar of 4/4 at 100
+    bpm, right on beat 1, left on beat 2, a half-note rest. They rest while
+    Direct wind is on.
+  - The other patterns (off by default) start on the first note of a phrase,
+    or on each note, and loop while you hold keys. Turning one on turns on
+    what it moves: Direct wind, or the Vox Humana stop.
 - **Rank voicing**: a drawer under Adjustments with level, fine tuning (±20
   cents) and brightness for each rank, plus a button to restore the factory
   voicing. Brightness reshapes the rank's harmonics and is level-matched, so it

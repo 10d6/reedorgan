@@ -128,7 +128,7 @@ test("Keyboard compass: Full range plays deep MIDI notes, Reed organ doesn't (D1
 });
 
 test("Easy wind: a full-organ chord drains like three reeds, and is remembered (D23)", async ({ page }) => {
-  await openOrgan(page);                                         // autoplay off, helper 100%
+  await openOrgan(page);                                         // treadle patterns off, helper 100%
   for (const s of ["Bourdon 16′", "Celeste 8′", "Principal 4′"]) await toggleStop(page, s);
   await hold(page, "z", "b", "q", "e", "t", "i");               // six notes × five stops = 30 reeds
   await page.waitForTimeout(400);
@@ -143,8 +143,8 @@ test("Easy wind: a full-organ chord drains like three reeds, and is remembered (
   await expect(page.locator("#easyWind")).toBeChecked();
 });
 
-test("Direct wind: the slider alone sets the reservoir; treadles, autoplay and playing don't move it (D26)", async ({ page }) => {
-  await openOrgan(page, { quiet: false });                      // autoplay on, helper 2%
+test("Direct wind: the slider alone sets the reservoir; treadles, the sequencer's treadle patterns and playing don't move it (D26)", async ({ page }) => {
+  await openOrgan(page, { quiet: false });                      // treadle patterns pumping, helper 2%
   await expect(page.locator("#directOn")).not.toBeChecked();
   await expect(page.locator("#airAmt")).toBeDisabled();
   await page.locator("#directOn").check();
@@ -154,7 +154,7 @@ test("Direct wind: the slider alone sets the reservoir; treadles, autoplay and p
   await hold(page, "z", "b", "q", "e", "t", "i");              // a big chord that would drain the wind
   await page.waitForTimeout(1500);
   expect(await readout(page, "rWind")).toBe("3.0″");
-  await expect(page.locator("#flowR")).toHaveText("idle");      // autoplay rests
+  await expect(page.locator("#flowR")).toHaveText("idle");      // the treadle patterns rest (D32)
   await expect(page.locator("#status")).toHaveText("Direct wind");
   for (let i = 0; i < 4; i++) { const k = i % 2 ? "ArrowRight" : "ArrowLeft"; await page.keyboard.down(k); await page.waitForTimeout(120); await page.keyboard.up(k); }
   expect(await readout(page, "rWind")).toBe("3.0″");           // pumping adds nothing

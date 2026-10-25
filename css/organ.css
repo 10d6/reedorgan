@@ -186,26 +186,6 @@ kbd{font-family:var(--f-body);font-size:13px;border:1px solid var(--brass-dim);b
 .sec-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;margin:0 0 4px}
 .sec-head h2{font-family:var(--f-display);font-weight:400;font-size:20px;color:var(--brass);margin:0;letter-spacing:.03em}
 .feet{display:grid;grid-template-columns:1fr 1fr;gap:20px}
-/* Pedal autoplay (D22): a row of measures, one button per beat */
-.autoplay{margin:0 0 18px;display:flex;flex-direction:column;gap:12px}
-.auto-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap}
-.auto-head .rail-label{margin:0 0 0 4px}
-.auto-ctrls{display:grid;grid-template-columns:minmax(0,2fr) auto auto;gap:12px 20px;align-items:end}
-.auto-ctrls .field{display:flex;flex-direction:column;gap:4px;min-width:0}
-.auto-grid{display:flex;flex-wrap:wrap;gap:10px}
-.measure{display:grid;gap:4px;flex:1 1 180px;min-width:0;padding:6px;border-radius:6px;border:1px solid #3f2617;background:#1a0f09}
-.beat{
-  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;min-width:0;height:48px;padding:2px;
-  border:1px solid var(--brass-dim);border-radius:5px;cursor:pointer;background:linear-gradient(180deg,#3a2216,#24140c);
-}
-.beat-n{font-size:10px;color:var(--muted);line-height:1}
-.beat-v{font-family:var(--f-display);font-size:17px;line-height:1.1;min-height:19px}
-.beat[data-v="L"],.beat[data-v="R"]{background:linear-gradient(180deg,var(--carpet-hi),var(--carpet));border-color:#1a0c06;color:#f3dcc0}
-.beat[data-v="-"] .beat-v{color:var(--muted)}
-.beat[data-v="~"]{background:linear-gradient(180deg,#5a2430,#3e1620);border-color:#1a0c06}
-.beat[data-v="~"] .beat-v::before{content:"";display:block;margin:8px auto 0;border-top:3px solid #c98a8f;border-radius:2px;width:22px}
-.beat.now{box-shadow:0 0 0 2px var(--brass),0 0 10px rgba(201,160,82,.5)}
-@media (max-width:560px){.auto-ctrls{grid-template-columns:1fr 1fr}.auto-ctrls .field:first-child{grid-column:1 / -1}}
 .foot{display:flex;flex-direction:column;gap:14px;align-items:stretch;min-width:0}
 .treadle{
   align-self:center;width:min(190px,100%);height:96px;border:0;cursor:pointer;border-radius:10px;padding:10px;
@@ -316,3 +296,12 @@ kbd{font-family:var(--f-body);font-size:13px;border:1px solid var(--brass-dim);b
 .seq-play{position:absolute;top:0;bottom:0;width:2px;margin-left:-1px;background:var(--brass);box-shadow:0 0 8px rgba(201,160,82,.7)}
 @media (max-width:560px){.seq-grid{--label:28px}.seq-label span{display:none}}
 @media (prefers-reduced-motion:reduce){.seq-play{box-shadow:none}}
+/* The sequencer in the Treadles section (D32): its lanes as tabs with a lamp */
+.seq{margin:0 0 18px;display:flex;flex-direction:column;gap:12px}
+.seq .rail-label{margin-bottom:0}
+.seq-tabs{display:flex;flex-wrap:wrap;gap:6px}
+.seq-tab{appearance:none;display:inline-flex;align-items:center;gap:7px;padding:5px 11px;border-radius:999px;border:1px solid rgba(201,160,82,.35);background:rgba(0,0,0,.22);color:var(--muted);font:inherit;font-size:14px;cursor:pointer}
+.seq-tab[aria-selected="true"]{background:linear-gradient(180deg,#4a2c1c,#2e1a10);color:var(--text);border-color:var(--brass)}
+.seq-tab .lamp{width:8px;height:8px;border-radius:50%;background:#3a2a1c;box-shadow:inset 0 0 0 1px rgba(0,0,0,.5)}
+.seq-tab.on .lamp{background:#f0c060;box-shadow:0 0 6px rgba(240,192,96,.8)}
+.seq-head .field:first-child{flex:1 1 200px}

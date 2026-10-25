@@ -118,12 +118,20 @@ export async function openOrgan(page, { quiet = true } = {}) {
   await page.goto("/");
   await expect(page.locator("#keys .key").first()).toBeVisible();
   if (quiet) {
-    // Steady wind, nothing but the reeds: makes measurements repeatable. Pedal
-    // autoplay is off, because its strokes ripple the wind (D22).
-    if (await page.locator("#autoOn").isChecked()) await page.locator("#autoOn").uncheck();
+    // Steady wind, nothing but the reeds: makes measurements repeatable. The
+    // sequencer's treadle patterns are off, because their strokes ripple the wind (D32).
+    await stopPumping(page);
     for (const [id, v] of [["helper", 100], ["breathAmt", 0], ["thumpAmt", 0], ["roomAmt", 0], ["cabAmt", 0]]) await setSlider(page, id, v);
   }
   return errors;
+}
+
+/** Turns off the modulation sequencer's two treadle patterns (they pump by default, D32). */
+export async function stopPumping(page) {
+  for (const lane of ["left", "right"]) {
+    await page.click(`#seqLanes .seq-tab[data-lane="${lane}"]`);
+    if (await page.locator("#seqOn").isChecked()) await page.locator("#seqOn").uncheck();
+  }
 }
 
 /** Moves a slider as if the player dragged it. */

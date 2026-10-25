@@ -7,9 +7,8 @@ import { GMAX, PEAK_FLOW, gaugeInches, windCents, windDrain, stepEnvelope } from
 import { S, stops, voices, reduceMotion } from './state.js';
 import { applyWind, setFanSpeed } from './audio.js';
 import { ctl } from './controls.js';
-import { ped, placeDot } from './treadles.js';
-import { stepAutoplay, autoplayOn } from './autoplay.js';
-import { seqTick, seqPlaying, seqTarget } from './modseq.js';
+import { ped, placeDot, seqPedal, pedalLevel } from './treadles.js';
+import { seqTick, seqPlaying, seqPumping } from './modseq.js';
 
 let needle, rWind, rPitch, rReeds, rUse, statusEl;
 let last = performance.now(), uiT = 0;
@@ -30,28 +29,30 @@ function drawGauge() {
 
 function frame(now) {
   const dt = Math.min(.05, (now - last) / 1000); last = now;
-  // the modulation sequencer's target and value this frame, or null (D30, D31)
-  const mod = seqTick(), modOn = t => mod !== null && mod.target === t;
-  setFanSpeed(modOn('fan') ? mod.value : null);
+  // what each playing lane of the modulation sequencer wants this frame (D30–D32)
+  const mod = seqTick();
+  setFanSpeed(mod.fan ?? null);
   // the swell lid swings toward the knee lever rather than jumping; it follows
   // the sequencer more closely, so its curves keep their shape
-  S.swellPos += ((modOn('swell') ? mod.value / 100 : ctl.swell.value) - S.swellPos) * Math.min(1, dt / (modOn('swell') ? .04 : .12));
+  S.swellPos += ((mod.swell != null ? mod.swell / 100 : ctl.swell.value) - S.swellPos) * Math.min(1, dt / (mod.swell != null ? .04 : .12));
   const ranksOn = { bass: 0, treble: 0 };
   HALVES.forEach(h => { ranksOn[h] = RANKS.filter(r => stops[h][r.id]).length; });
   let sounding = 0, reeds = 0;
   for (const v of voices.values()) if (!v.released) { sounding++; reeds += ranksOn[v.half]; }
   const drain = windDrain(reeds, S.swellPos, S.easyWind);   // Easy wind caps the air at three reeds (D23)
 
-  stepAutoplay();                     // pedal autoplay presses and lifts the treadles (D22)
+  // the sequencer's treadle lanes press the pedals (D32); a foot pressing too
+  // takes whichever pedal is further down
+  seqPedal(ped.L, (mod.left ?? 0) / 100); seqPedal(ped.R, (mod.right ?? 0) / 100);
   let inflow = 0;
   for (const P of [ped.L, ped.R]) {
     stepEnvelope(P, dt);
-    inflow += P.lvl * PEAK_FLOW * P.boost * (1 - Math.min(1, S.pressure) * .5);
+    inflow += pedalLevel(P) * PEAK_FLOW * P.boost * (1 - Math.min(1, S.pressure) * .5);
   }
   const help = ctl.helperRate();
   inflow += help * Math.max(0, Math.min(1, (.8 - S.pressure) / .12));   // helper eases off near full
 
-  const seq = modOn('direct') ? mod.value / 3.6 : null;   // the sequencer's wind as a pressure, or null
+  const seq = mod.direct != null ? mod.direct / 3.6 : null;   // the sequencer's wind as a pressure, or null
   if (S.directWind) {
     // Direct wind (D26): the slider sets the reservoir's pressure, and nothing
     // else moves it, except the modulation sequencer while it plays. A short
@@ -71,8 +72,9 @@ function frame(now) {
 
   needle.setAttribute('transform', `rotate(${(-90 + 180 * S.pressure * .9).toFixed(1)} 100 112)`);
   for (const P of [ped.L, ped.R]) {
-    if (reduceMotion) P.el.style.filter = `brightness(${1 + P.lvl * .35})`;
-    else P.el.style.transform = `perspective(400px) rotateX(${(P.lvl * 24).toFixed(1)}deg)`;
+    const lvl = pedalLevel(P);
+    if (reduceMotion) P.el.style.filter = `brightness(${1 + lvl * .35})`;
+    else P.el.style.transform = `perspective(400px) rotateX(${(lvl * 24).toFixed(1)}deg)`;
     placeDot(P);
   }
 
@@ -84,16 +86,18 @@ function frame(now) {
     rReeds.textContent = reeds;
     rUse.textContent = drain.toFixed(2) + '/s';
     for (const P of [ped.L, ped.R]) {
-      P.flowEl.textContent = P.stage === 'idle' ? 'idle' : ({ a: 'attack', d: 'decay', s: 'sustain', r: 'release' }[P.stage]) + ' · ' + (P.lvl * PEAK_FLOW * P.boost).toFixed(2) + '/s';
+      // the foot's envelope stage, or "sequencer" while only the sequencer is pressing it (D32)
+      const stage = P.stage !== 'idle' ? ({ a: 'attack', d: 'decay', s: 'sustain', r: 'release' }[P.stage]) : P.seq > 0 ? 'sequencer' : null;
+      P.flowEl.textContent = stage ? stage + ' · ' + (pedalLevel(P) * PEAK_FLOW * P.boost).toFixed(2) + '/s' : 'idle';
     }
     let msg = '', ok = false;
     if (!S.started) { msg = 'Press a key to start'; ok = true; }
-    else if (S.directWind) { msg = seqPlaying() && seqTarget() === 'direct' ? 'Sequencer moving the wind' : 'Direct wind'; ok = true; }
+    else if (S.directWind) { msg = seqPlaying('direct') ? 'Sequencer moving the wind' : 'Direct wind'; ok = true; }
     else if (S.reliefT > 0) msg = 'Relief valve venting';
     else if (S.pressure < .05 && sounding) msg = 'Out of wind. Pump!';
     else if (S.pressure < .2) msg = 'Wind is low';
-    else if (!autoplayOn() && help > 0 && help < drain && sounding && inflow < drain) msg = 'Helper can’t keep up; wind falling';   // autoplay's gaps between strokes would make this flicker
-    else { msg = autoplayOn() ? 'Autoplay pumping' : help > 0 ? 'Helper pumping' : 'Keep pumping to hold the wind'; ok = true; }
+    else if (!seqPumping() && help > 0 && help < drain && sounding && inflow < drain) msg = 'Helper can’t keep up; wind falling';   // the gaps between the sequencer's strokes would make this flicker
+    else { msg = seqPumping() ? 'Sequencer pumping' : help > 0 ? 'Helper pumping' : 'Keep pumping to hold the wind'; ok = true; }
     statusEl.textContent = msg; statusEl.classList.toggle('ok', ok);
   }
   requestAnimationFrame(frame);

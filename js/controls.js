@@ -2,8 +2,7 @@
 // setupControls() binds them to the page; the sound reads them through `ctl`.
 
 import { RANKS } from './core/ranks.js';
-import { retime } from './autoplay.js';
-import { seqRetime, seqAmountText } from './modseq.js';
+import { seqRetime } from './modseq.js';
 import { HELPER_MAX, GMAX } from './core/wind.js';
 import { volumeGain, bassCutHz } from './core/output.js';
 import { VIB_DELAY_MAX } from './core/expression.js';
@@ -180,14 +179,12 @@ export function setupControls() {
   exprPanel.open = store.get('exprOpen', false);
   exprPanel.addEventListener('toggle', () => store.set('exprOpen', exprPanel.open));
 
-  /* ---- pedal autoplay tempo (D22) ---- */
-  ctl.tempo = bindSlider('tempoAmt', 'autoTempo', 100, v => v + ' bpm', () => { retime(); seqRetime(); });   // the sequencer keeps time with it too (D30)
-  // the modulation sequencer's Amount (D30): how far each note moves its target, as a share of its range
-  ctl.seqAmount = bindSlider('seqAmountAmt', 'seqAmount', 25, v => seqAmountText(v), null, v => v / 100);
+  /* ---- the modulation sequencer's tempo (D32; Pedal autoplay's until then, so the store key is unchanged) ---- */
+  ctl.tempo = bindSlider('tempoAmt', 'autoTempo', 100, v => v + ' bpm', () => seqRetime());
 
   /* ---- helper pump ---- */
   const helperEl = $('helper'), helperOut = $('helperOut');
-  helperEl.value = store.get('helper', 2);   // 2% since D22: a trickle, so autoplay does most of the work
+  helperEl.value = store.get('helper', 2);   // 2% since D22: a trickle, so the sequencer's treadles do most of the work
   const syncHelper = () => { const v = +helperEl.value; helperOut.textContent = v === 0 ? 'Off' : v + '% · ' + (v / 100 * HELPER_MAX).toFixed(2) + '/s'; };
   helperEl.addEventListener('input', () => { initAudio(); store.set('helper', +helperEl.value); syncHelper(); });
   syncHelper();

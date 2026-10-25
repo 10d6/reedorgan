@@ -1,27 +1,61 @@
-// The modulation sequencer (D30, D31): a piano roll of sweep shapes that moves
-// Direct wind, the Vox Humana fan's speed or the knee swell in time with the
-// tempo. The pattern maths is in core/modseq.js; this module draws the editor,
-// saves the pattern, starts and stops it from the keys (seqPress,
-// seqReleaseAll), and tells the control loop each frame what it wants for its
-// target (seqTick).
+// The modulation sequencer (D30–D32): piano rolls of sweep shapes, one for each
+// thing it moves (the two treadles, Direct wind, the Vox Humana fan's speed and
+// the knee swell), all playing together in time with its tempo. The treadle
+// lanes are the bellows: they pump all the time, from the first touch, in place
+// of Pedal autoplay. The other lanes start from the keys.
+//
+// The pattern maths is in core/modseq.js; this module draws the editor, saves
+// the pattern, starts and stops the key-driven lanes (seqPress, seqReleaseAll),
+// and tells the control loop each frame what every playing lane wants (seqTick).
 
-import { SEQ_ROWS, SEQ_CURVES, DEFAULT_SEQ, normaliseSeq, placeNote, resizeNote, removeNote, setBars, seqValue, seqSteps, seqPosition, seqShape, stepSeconds, toShare, fromShare, amountText } from './core/modseq.js';
+import {
+  SEQ_ROWS, SEQ_CURVES, SEQ_TARGETS, LANE_NAMES, FREE_LANES, METERS, MAX_BARS, normaliseSeq, migrateSaved, reshape,
+  placeNote, resizeNote, removeNote, seqValue, seqSteps, stepsPerBar, stepsPerBeat, seqPosition, seqShape, stepSeconds,
+  toShare, fromShare, amountText,
+} from './core/modseq.js';
 import { S, stops, store } from './state.js';
+import { ctx } from './audio.js';
 import { ctl, setDirectWind } from './controls.js';
 import { drawVox } from './stops.js';
 
-let P = normaliseSeq(DEFAULT_SEQ);   // the pattern: on, target, bars, trigger, notes
-let t0 = null;                       // when the current pass started (seconds), or null when stopped
-let lastTempo = 100, sel = -1;       // the selected note's index, or −1
-let gridEl, laneEl, playEl, onEl;
+let P = normaliseSeq();       // meter, bars, trigger, edit (the lane on show), lanes {on, amount, notes}
+let t0 = null;                // when the key-driven lanes' pass started (seconds), or null when stopped
+let free0 = null;             // when the treadle lanes started (seconds), or null while they rest
+let lastTempo = 100, sel = -1; // the selected note's index in the lane on show, or −1
+let gridEl, laneEl, playEl, onEl, amountEl, amountOut, tabsEl;
 
-const save = () => store.set('modseq', P);
+const save = () => store.set('seq', P);
 const now = () => performance.now() / 1000;
+const lane = () => P.lanes[P.edit];
+const steps = () => seqSteps(P.meter, P.bars);
 const rowOf = id => SEQ_ROWS.findIndex(r => r.id === id);
 // grid rows: 1 the beat numbers, 2 "Sweep up", 3–6 its curves, 7 "Sweep down", 8–11 its curves
 const gridRow = i => i < 4 ? 3 + i : 4 + i;
 const describe = r => `Sweep ${r.dir > 0 ? 'up' : 'down'}, ${SEQ_CURVES[r.curve]}`;
-const where = s => `bar ${Math.floor(s / 16) + 1}, beat ${Math.floor(s % 16 / 4) + 1}, 16th ${s % 4 + 1}`;
+function where(s) {
+  const bar = stepsPerBar(P.meter), beat = stepsPerBeat(P.meter);
+  return `bar ${Math.floor(s / bar) + 1}, beat ${Math.floor(s % bar / beat) + 1}, 16th ${s % beat + 1}`;
+}
+
+// Each lane's control, in its own units: its own setting (where every pass
+// starts), whether it can move right now, and how to turn it on.
+//  - The treadles start up (0) and rest while Direct wind supplies the air;
+//    turning a treadle lane on turns Direct wind off.
+//  - Direct wind only moves the wind while it's on; turning its lane on turns
+//    it on (and the treadle lanes then rest).
+//  - The fan only turns while the Vox Humana is drawn; turning its lane on
+//    draws the stop.
+const TARGETS = {
+  left: { base: () => 0, ready: () => !S.directWind, enable: () => { if (S.directWind) setDirectWind(false); } },
+  right: { base: () => 0, ready: () => !S.directWind, enable: () => { if (S.directWind) setDirectWind(false); } },
+  direct: { base: () => ctl.directAir.value * 3.6, ready: () => S.directWind, enable: () => { if (!S.directWind) setDirectWind(true); } },
+  fan: { base: () => ctl.voxRate(), ready: () => stops.vox, enable: () => drawVox() },
+  swell: { base: () => ctl.swell.value * 100, ready: () => true, enable: () => {} },
+};
+const isFree = id => FREE_LANES.includes(id);
+// The time a lane's current pass started, or null if it isn't running.
+const startOf = id => isFree(id) ? free0 : t0;
+const playing = id => P.lanes[id].on && startOf(id) !== null && TARGETS[id].ready();
 
 // A curve as an SVG path in a 100 × 100 box, rising or falling.
 function curvePath(r) {
@@ -31,23 +65,38 @@ function curvePath(r) {
 }
 const curveSvg = (r, cls) => `<svg class="${cls}" viewBox="-4 -4 108 108" preserveAspectRatio="none" aria-hidden="true"><path d="${curvePath(r)}" vector-effect="non-scaling-stroke"/></svg>`;
 
-/* ---------- the piano roll ---------- */
+/* ---------- the lanes and the piano roll ---------- */
+function renderTabs() {
+  tabsEl.querySelectorAll('.seq-tab').forEach(b => {
+    const id = b.dataset.lane;
+    b.setAttribute('aria-selected', id === P.edit ? 'true' : 'false');
+    b.classList.toggle('on', P.lanes[id].on);
+  });
+  onEl.checked = lane().on;
+  amountEl.value = Math.round(lane().amount * 100);
+  amountOut.textContent = amountText(P.edit, +amountEl.value);
+  gridEl.setAttribute('aria-label', `${LANE_NAMES[P.edit]} pattern`);
+}
 function render() {
-  const n = seqSteps(P.bars);
+  const n = steps(), bar = stepsPerBar(P.meter), beat = stepsPerBeat(P.meter);
   gridEl.style.setProperty('--steps', n);
   let h = '';
-  for (let s = 0; s < n; s++) if (s % 4 === 0) h += `<span class="seq-beat${s % 16 === 0 ? ' is-bar' : ''}" style="grid-column:${s + 2} / span 4">${s % 16 === 0 && P.bars > 1 ? `${s / 16 + 1}.` : ''}${s % 16 / 4 + 1}</span>`;
+  for (let s = 0; s < n; s += beat) {
+    const b = Math.floor(s / bar), k = s % bar / beat + 1;
+    h += `<span class="seq-beat${s % bar === 0 ? ' is-bar' : ''}" style="grid-column:${s + 2} / span ${beat}">${s % bar === 0 && P.bars > 1 ? `${b + 1}.` : ''}${k}</span>`;
+  }
   h += `<span class="seq-group" style="grid-row:2">Sweep up</span><span class="seq-group" style="grid-row:7">Sweep down</span>`;
   SEQ_ROWS.forEach((r, i) => {
     h += `<span class="seq-label" style="grid-row:${gridRow(i)}">${curveSvg(r, 'seq-icon')}<span>${SEQ_CURVES[r.curve]}</span></span>`;
     for (let s = 0; s < n; s++) {
-      h += `<button type="button" class="seq-cell${s % 4 === 0 ? ' is-beat' : ''}${s % 16 === 0 ? ' is-bar' : ''}" style="grid-row:${gridRow(i)};grid-column:${s + 2}" data-row="${r.id}" data-step="${s}" aria-label="${describe(r)}, ${where(s)}"></button>`;
+      h += `<button type="button" class="seq-cell${s % beat === 0 ? ' is-beat' : ''}${s % bar === 0 ? ' is-bar' : ''}" style="grid-row:${gridRow(i)};grid-column:${s + 2}" data-row="${r.id}" data-step="${s}" aria-label="${describe(r)}, ${where(s)}"></button>`;
     }
   });
-  P.notes.forEach((x, k) => { h += noteHtml(x, k); });
+  lane().notes.forEach((x, k) => { h += noteHtml(x, k); });
   h += `<div class="seq-lane" style="grid-column:2 / -1;grid-row:1 / -1"><div class="seq-play" hidden></div></div>`;
   gridEl.innerHTML = h;
   laneEl = gridEl.querySelector('.seq-lane'); playEl = gridEl.querySelector('.seq-play');
+  renderTabs();
 }
 function noteHtml(x, k) {
   const r = SEQ_ROWS[rowOf(x.row)];
@@ -61,7 +110,7 @@ function select(k, focus = true) {
   gridEl.querySelectorAll('.seq-note').forEach(el => el.classList.toggle('selected', +el.dataset.i === k));
   const el = gridEl.querySelector(`.seq-note[data-i="${k}"]`); if (el && focus) el.focus();
 }
-function edit({ notes, index }) { P.notes = notes; save(); render(); if (index >= 0) select(index); }
+function edit({ notes, index }) { lane().notes = notes; save(); render(); if (index >= 0) select(index); }
 
 // Stretching a note by dragging either end. The note is updated in place while
 // dragging (re-drawing would lose the pointer), and saved when it's let go.
@@ -70,10 +119,10 @@ function startDrag(e, handle) {
   e.preventDefault(); e.stopPropagation(); select(k);
   handle.setPointerCapture(e.pointerId);
   const move = ev => {
-    const box = laneEl.getBoundingClientRect(), n = seqSteps(P.bars);
+    const box = laneEl.getBoundingClientRect(), n = steps();
     const to = Math.round((ev.clientX - box.left) / box.width * n);
-    P.notes = resizeNote(P.notes, k, edge, to, n).notes;
-    el.style.cssText = noteStyle(P.notes[k]); el.setAttribute('aria-label', noteLabel(P.notes[k]));
+    lane().notes = resizeNote(lane().notes, k, edge, to, n).notes;
+    el.style.cssText = noteStyle(lane().notes[k]); el.setAttribute('aria-label', noteLabel(lane().notes[k]));
   };
   const up = () => { handle.removeEventListener('pointermove', move); handle.removeEventListener('pointerup', up); handle.removeEventListener('pointercancel', up); save(); render(); select(k); };
   handle.addEventListener('pointermove', move); handle.addEventListener('pointerup', up); handle.addEventListener('pointercancel', up);
@@ -85,10 +134,10 @@ function startDrag(e, handle) {
 //  backwards by a 16th; Alt+← / Alt+→ shorten it from the end or the start.
 function onKey(e) {
   const el = e.target.closest && e.target.closest('.seq-note'); if (!el) return;
-  const k = +el.dataset.i, x = P.notes[k], n = seqSteps(P.bars);
+  const k = +el.dataset.i, x = lane().notes[k], n = steps();
   if (e.key === 'Backspace' || e.key === 'Delete') {
     e.preventDefault(); e.stopPropagation();
-    P.notes = removeNote(P.notes, k); sel = -1; save(); render();
+    lane().notes = removeNote(lane().notes, k); sel = -1; save(); render();
     gridEl.querySelector(`.seq-cell[data-row="${x.row}"][data-step="${x.start}"]`)?.focus();
     return;
   }
@@ -97,75 +146,82 @@ function onKey(e) {
   const right = e.key === 'ArrowRight';
   const [edge, to] = e.shiftKey ? (right ? ['end', x.start + x.len + 1] : ['start', x.start - 1])
     : (right ? ['start', x.start + 1] : ['end', x.start + x.len - 1]);
-  edit(resizeNote(P.notes, k, edge, to, n));
+  edit(resizeNote(lane().notes, k, edge, to, n));
 }
 
 /* ---------- playing ---------- */
-// A key going down starts the pattern: on the first note of a phrase (no other
-// keys held), or on every note with Each note. It loops while keys are held.
+// A key going down starts the key-driven lanes: on the first note of a phrase
+// (no other keys held), or on every note with Each note. They loop while keys
+// are held.
 export function seqPress(first) {
-  if (!P.on) return;
   if (first || P.trigger === 'each' || t0 === null) t0 = now();
 }
-// Letting go of every key stops it, and the wind eases back to its own setting.
+// Letting go of every key stops them, and each control eases back to its own setting.
 export function seqReleaseAll() { t0 = null; }
-// Each target, in its own units: its own setting (where every pass starts),
-// whether it can be moved right now, and how to turn it on. Direct wind only
-// moves the wind while it's on, and the fan only turns while its stop is drawn.
-const TARGETS = {
-  direct: { base: () => ctl.directAir.value * 3.6, ready: () => S.directWind, enable: () => { if (!S.directWind) setDirectWind(true); } },
-  fan: { base: () => ctl.voxRate(), ready: () => stops.vox, enable: () => drawVox() },
-  swell: { base: () => ctl.swell.value * 100, ready: () => true, enable: () => {} },
-};
-export const seqTarget = () => P.target;
-export const seqPlaying = () => P.on && t0 !== null && TARGETS[P.target].ready();
-// The Amount readout for slider position `pct`, in the current target's units.
-export const seqAmountText = pct => amountText(P.target, pct);
+// Whether the treadle lanes are pumping now (for the status line).
+export const seqPumping = () => FREE_LANES.some(playing);
+export const seqPlaying = id => playing(id);
 
-// Once a frame, from the control loop: {target, value} with the value the
-// sequencer wants, in the target's units (inches, Hz or percent), or null when
-// it isn't moving anything. Each pass starts from the target's own setting.
+// Once a frame, from the control loop: what every playing lane wants, in its
+// own units ({left, right} in percent of a stroke, {direct} in inches, {fan}
+// in Hz, {swell} in percent); a lane that isn't playing is missing. Each pass
+// starts from the control's own setting. The treadle lanes start with the
+// sound (the first touch) and rest, starting again from beat 1, while Direct
+// wind is on.
 export function seqTick() {
-  if (!seqPlaying()) { if (playEl && !playEl.hidden) playEl.hidden = true; return null; }
-  const n = seqSteps(P.bars), pos = seqPosition(now() - t0, ctl.tempo.value, n), T = TARGETS[P.target];
-  if (playEl) { playEl.hidden = false; playEl.style.left = (pos / n * 100).toFixed(2) + '%'; }
-  const share = seqValue(P.notes, pos, toShare(P.target, T.base()), ctl.seqAmount.value);
-  return { target: P.target, value: fromShare(P.target, share) };
+  const out = {}, t = now();
+  if (ctx && FREE_LANES.some(id => P.lanes[id].on) && !S.directWind) { if (free0 === null) free0 = t; }
+  else free0 = null;
+  const n = steps();
+  for (const id of SEQ_TARGETS) {
+    if (!playing(id)) continue;
+    const pos = seqPosition(t - startOf(id), ctl.tempo.value, P.meter, n), L = P.lanes[id];
+    out[id] = fromShare(id, seqValue(L.notes, pos, toShare(id, TARGETS[id].base()), L.amount));
+  }
+  if (playEl) {
+    const on = playing(P.edit);
+    if (on) playEl.style.left = (seqPosition(t - startOf(P.edit), ctl.tempo.value, P.meter, n) / n * 100).toFixed(2) + '%';
+    if (playEl.hidden === on) playEl.hidden = !on;
+  }
+  return out;
 }
-// A tempo change keeps the pattern's place.
+// A tempo change keeps both clocks' place.
 export function seqRetime() {
-  if (t0 !== null) { const t = now(), pos = (t - t0) / stepSeconds(lastTempo); t0 = t - pos * stepSeconds(ctl.tempo.value); }
+  const t = now(), from = stepSeconds(lastTempo, P.meter), to = stepSeconds(ctl.tempo.value, P.meter);
+  if (t0 !== null) t0 = t - (t - t0) / from * to;
+  if (free0 !== null) free0 = t - (t - free0) / from * to;
   lastTempo = ctl.tempo.value;
 }
 
 export function setupModSeq() {
-  P = normaliseSeq(store.get('modseq', DEFAULT_SEQ));
+  const saved = store.get('seq', null);
+  P = saved ? normaliseSeq(saved)
+    : migrateSaved({ autoplay: store.get('autoplay', null), modseq: store.get('modseq', null), amount: store.get('seqAmount', null) });
   lastTempo = ctl.tempo.value;
-  gridEl = document.getElementById('seqGrid'); onEl = document.getElementById('seqOn');
-  const barsEl = document.getElementById('seqBars'), trigEl = document.getElementById('seqTrigger'), targetEl = document.getElementById('seqTarget');
-  onEl.checked = P.on; barsEl.value = String(P.bars); trigEl.value = P.trigger; targetEl.value = P.target;
-  // Turning the sequencer on, or choosing what it moves while it's on, turns on
-  // what it moves: Direct wind, or the Vox Humana stop.
-  onEl.addEventListener('change', () => { P.on = onEl.checked; save(); t0 = null; if (P.on) TARGETS[P.target].enable(); });
-  barsEl.addEventListener('change', () => { P = setBars(P, +barsEl.value); sel = -1; save(); render(); });
+  gridEl = document.getElementById('seqGrid'); onEl = document.getElementById('seqOn'); tabsEl = document.getElementById('seqLanes');
+  amountEl = document.getElementById('seqAmountAmt'); amountOut = document.getElementById('seqAmountOut');
+  const meterEl = document.getElementById('seqMeter'), barsEl = document.getElementById('seqBars'), trigEl = document.getElementById('seqTrigger');
+  meterEl.innerHTML = Object.keys(METERS).map(k => `<option value="${k}">${k}</option>`).join('');
+  barsEl.innerHTML = Array.from({ length: MAX_BARS }, (_, i) => `<option value="${i + 1}">${i + 1} bar${i ? 's' : ''}</option>`).join('');
+  tabsEl.innerHTML = SEQ_TARGETS.map(id => `<button type="button" role="tab" class="seq-tab" data-lane="${id}"><span class="lamp" aria-hidden="true"></span>${LANE_NAMES[id]}</button>`).join('');
+  meterEl.value = P.meter; barsEl.value = String(P.bars); trigEl.value = P.trigger;
+  tabsEl.addEventListener('click', e => { const b = e.target.closest('.seq-tab'); if (!b) return; P.edit = b.dataset.lane; sel = -1; save(); render(); });
+  // Turning a lane on turns on what it moves (D31, D32).
+  onEl.addEventListener('change', () => { lane().on = onEl.checked; save(); if (lane().on) TARGETS[P.edit].enable(); renderTabs(); });
+  amountEl.addEventListener('input', () => { lane().amount = +amountEl.value / 100; save(); amountOut.textContent = amountText(P.edit, +amountEl.value); });
+  const reshapeTo = () => { P = reshape(P, meterEl.value, +barsEl.value); sel = -1; save(); render(); };
+  meterEl.addEventListener('change', reshapeTo); barsEl.addEventListener('change', reshapeTo);
   trigEl.addEventListener('change', () => { P.trigger = trigEl.value; save(); });
-  targetEl.addEventListener('change', () => {
-    P.target = targetEl.value; save(); if (P.on) TARGETS[P.target].enable();
-    ctl.seqAmount.set(+ctl.seqAmount.el.value, false);   // the readout's units follow the target
-  });
-  ctl.seqAmount.set(+ctl.seqAmount.el.value, false);
-  document.getElementById('seqClear').addEventListener('click', () => { P.notes = []; sel = -1; save(); render(); });
+  document.getElementById('seqClear').addEventListener('click', () => { lane().notes = []; sel = -1; save(); render(); });
   gridEl.addEventListener('pointerdown', e => { const h = e.target.closest('.seq-handle'); if (h) startDrag(e, h); });
   gridEl.addEventListener('click', e => {
     const note = e.target.closest('.seq-note');
     if (note) { select(+note.dataset.i); return; }
     const cell = e.target.closest('.seq-cell');
-    if (cell) edit(placeNote(P.notes, cell.dataset.row, +cell.dataset.step));
+    if (cell) edit(placeNote(lane().notes, cell.dataset.row, +cell.dataset.step));
   });
   gridEl.addEventListener('focusin', e => { const note = e.target.closest('.seq-note'); if (note && +note.dataset.i !== sel) select(+note.dataset.i, false); });
   gridEl.addEventListener('keydown', onKey);
-  const panel = document.getElementById('seqPanel');
-  panel.open = store.get('seqOpen', false);
-  panel.addEventListener('toggle', () => store.set('seqOpen', panel.open));
+  if (!saved) save();
   render();
 }

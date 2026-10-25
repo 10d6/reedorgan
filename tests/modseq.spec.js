@@ -1,9 +1,10 @@
-// The modulation sequencer (D30, D31): its piano roll, and how it moves Direct
-// wind, the Vox Humana fan's speed and the knee swell.
+// The modulation sequencer (D30–D32): its lanes and piano roll, how it pumps the
+// treadles (in place of Pedal autoplay), and how it moves Direct wind, the Vox
+// Humana fan's speed and the knee swell.
 // The wind is read from the gauge's needle every frame (window.__gaugeTrace in
 // organ.js). Patterns run at 120 bpm, so one bar is 2 s and a 16th is 125 ms.
 import { test, expect } from "@playwright/test";
-import { openOrgan, setSlider, gaugeTrace, readout, toggleStop, rms, db } from "./organ.js";
+import { openOrgan, setSlider, gaugeTrace, readout, toggleStop, rms, db, hold, letGo, stopPumping } from "./organ.js";
 
 const A3 = 57, C4 = 60;
 const on = (m) => [0x90, m, 100], off = (m) => [0x80, m, 0];
@@ -13,11 +14,16 @@ const cell = (page, row, step) => page.locator(`#seqGrid .seq-cell[data-row="${r
 const at = (trace, t) => trace.find((f) => f[0] >= t)[1];
 const between = (trace, t0, t1) => trace.filter((f) => f[0] >= t0 && f[0] < t1).map((f) => f[1]);
 
-async function setup(page) {
+// Shows a lane's pattern in the editor: left, right, direct, fan or swell.
+const showLane = (page, id) => page.click(`#seqLanes .seq-tab[data-lane="${id}"]`);
+// Shows a lane and turns it on.
+async function playLane(page, id) { await showLane(page, id); await page.check("#seqOn"); }
+// The quiet setup turns the treadle patterns off; most tests then show one lane.
+async function setup(page, lane = "direct") {
   await openOrgan(page);
   await page.click("#midiBtn");
-  await page.locator("#seqPanel summary").click();
   await setSlider(page, "tempoAmt", 120);
+  await showLane(page, lane);
 }
 async function pattern(page, list) {
   await page.click("#seqClear");
@@ -27,25 +33,27 @@ async function pattern(page, list) {
   }
 }
 
-test("the sequencer is off by default and leaves Direct wind alone (D30)", async ({ page }) => {
-  await openOrgan(page);
-  await expect(page.locator("#seqOn")).not.toBeChecked();
-  await expect(page.locator("#seqPanel")).not.toHaveAttribute("open", "");
+test("the sequencer's other patterns are off by default and leave Direct wind alone (D30, D32)", async ({ page }) => {
+  await openOrgan(page, { quiet: false });
   await expect(page.locator("#directOn")).not.toBeChecked();
-  expect(await page.locator("#seqTrigger").inputValue()).toBe("first");
-  expect(await page.locator("#seqBars").inputValue()).toBe("1");
+  for (const id of ["direct", "fan", "swell"]) await expect(page.locator(`#seqLanes .seq-tab[data-lane="${id}"]`)).not.toHaveClass(/\bon\b/);
+  await showLane(page, "direct");
+  await expect(page.locator("#seqOn")).not.toBeChecked();
   await expect(page.locator("#seqAmountOut")).toHaveText("25% · 0.9″");
   expect(await notes(page)).toEqual(["Sweep up, S-curve, 8 sixteenths from bar 1, beat 1, 16th 1", "Sweep down, S-curve, 8 sixteenths from bar 1, beat 3, 16th 1"]);
 });
 
-test("turning the sequencer on turns Direct wind on (D30)", async ({ page }) => {
+test("turning on the Direct wind pattern turns Direct wind on; turning on a treadle pattern turns it off (D30, D32)", async ({ page }) => {
   await setup(page);
   await page.check("#seqOn");
   await expect(page.locator("#directOn")).toBeChecked();
   await expect(page.locator("#airAmt")).toBeEnabled();
   await page.reload();
+  await showLane(page, "direct");
   await expect(page.locator("#seqOn")).toBeChecked();
   await expect(page.locator("#directOn")).toBeChecked();
+  await playLane(page, "left");
+  await expect(page.locator("#directOn")).not.toBeChecked();
 });
 
 test("the default pattern swells the wind up and back each bar, from the Direct wind setting (D30)", async ({ page }) => {
@@ -144,7 +152,7 @@ test("the piano roll: place, replace, stretch, shorten, delete, clear and length
 });
 
 test("keys on a selected note stay out of the organ; other keys still play (D30)", async ({ page }) => {
-  await setup(page);
+  await setup(page, "right");                                 // a treadle pattern, turned off by the quiet setup
   await page.locator("#seqGrid .seq-note").first().click();
   await page.keyboard.down("Shift"); await page.keyboard.down("ArrowRight");
   await page.waitForTimeout(200);
@@ -179,24 +187,22 @@ function flickerHz(frames, t0, t1) {
 const avgRms = async (page, n = 8) => { let s = 0; for (let i = 0; i < n; i++) { s += await rms(page); await page.waitForTimeout(60); } return s / n; };
 const fanSpeed = (page, v) => page.$eval("#voxRate", (el, x) => { el.value = x; el.dispatchEvent(new Event("input", { bubbles: true })); }, v);
 
-test("choosing what it moves turns that on: the fan draws the Vox Humana; the swell needs nothing (D31)", async ({ page }) => {
-  await setup(page);
-  await expect(page.locator("#seqTarget option")).toHaveText(["Direct wind", "Vox Humana fan speed", "Knee swell"]);
-  await page.selectOption("#seqTarget", "fan");                 // while the sequencer is off, nothing changes
-  await expect(page.getByRole("button", { name: "Vox Humana tremolo" })).toHaveAttribute("aria-pressed", "false");
+test("turning on the fan pattern draws the Vox Humana; the swell needs nothing (D31, D32)", async ({ page }) => {
+  await setup(page, "fan");
+  await expect(page.locator("#seqLanes .seq-tab")).toHaveText(["Left treadle", "Right treadle", "Direct wind", "Fan speed", "Knee swell"]);
+  await expect(page.getByRole("button", { name: "Vox Humana tremolo" })).toHaveAttribute("aria-pressed", "false");   // showing it changes nothing
   await expect(page.locator("#seqAmountOut")).toHaveText("25% · 2.8 Hz");
   await page.check("#seqOn");
   await expect(page.getByRole("button", { name: "Vox Humana tremolo" })).toHaveAttribute("aria-pressed", "true");
   await expect(page.locator("#voxPanel")).toHaveAttribute("open", "");
   await expect(page.locator("#directOn")).not.toBeChecked();
-  await page.selectOption("#seqTarget", "swell");
+  await expect(page.locator('#seqLanes .seq-tab[data-lane="fan"]')).toHaveClass(/\bon\b/);
+  await playLane(page, "swell");
   await expect(page.locator("#seqAmountOut")).toHaveText("25% of the swell");
   await expect(page.locator("#directOn")).not.toBeChecked();
-  await page.selectOption("#seqTarget", "direct");                // choosing Direct wind while on turns it on
-  await expect(page.locator("#directOn")).toBeChecked();
-  await page.selectOption("#seqTarget", "fan");
   await page.reload();
-  expect(await page.locator("#seqTarget").inputValue()).toBe("fan");
+  await showLane(page, "fan");
+  await expect(page.locator("#seqOn")).toBeChecked();
   await expect(page.locator("#seqAmountOut")).toHaveText("25% · 2.8 Hz");
 });
 
@@ -204,8 +210,7 @@ test("the sequencer drives the fan's speed, then lets it ease back to its slider
   await setup(page);
   await toggleStop(page, "Melodia 8′");                          // Diapason alone: plenty of treble for the fan
   await fanSpeed(page, 3);
-  await page.selectOption("#seqTarget", "fan");
-  await page.check("#seqOn");                                     // draws the Vox Humana
+  await playLane(page, "fan");                                    // draws the Vox Humana
   await setSlider(page, "seqAmountAmt", 50);                      // 5.5 Hz
   await page.click("#seqClear");
   await cell(page, "up-linear", 0).click();                      // straight up in one 16th, then hold
@@ -226,9 +231,8 @@ test("the sequencer drives the fan's speed, then lets it ease back to its slider
 });
 
 test("the sequencer opens the knee swell without moving its slider, and lets it close again (D31)", async ({ page }) => {
-  await setup(page);
+  await setup(page, "swell");
   await toggleStop(page, "Melodia 8′");
-  await page.selectOption("#seqTarget", "swell");
   await setSlider(page, "seqAmountAmt", 100);
   await page.click("#seqClear");
   await cell(page, "up-linear", 0).click();                      // fully open in one 16th, then hold
@@ -250,12 +254,126 @@ test("the sequencer opens the knee swell without moving its slider, and lets it 
 });
 
 test("the fan only follows the sequencer while the Vox Humana is drawn (D31)", async ({ page }) => {
-  await setup(page);
-  await page.selectOption("#seqTarget", "fan");
+  await setup(page, "fan");
   await page.check("#seqOn");
   await toggleStop(page, "Vox Humana tremolo");                    // retire it again
   await midi(page, on(A3)); await page.waitForTimeout(300);
   await expect(page.getByRole("button", { name: "Vox Humana tremolo" })).toHaveAttribute("aria-pressed", "false");   // playing doesn't redraw it
   await expect(page.locator("#seqGrid .seq-play")).toBeHidden();
   await midi(page, off(A3));
+});
+
+/* ---------- D32: the treadle patterns pump the organ ---------- */
+// Each pedal's position every frame, from how far it's drawn tilted (24° fully down).
+const pedalTrace = (page, ms) => page.evaluate((ms) => new Promise((done) => {
+  const out = [], t0 = performance.now(), deg = (id) => +(/rotateX\(([-\d.]+)deg/.exec(document.getElementById(id).style.transform) || [0, 0])[1];
+  const f = () => { out.push([(performance.now() - t0) / 1000, deg("tL") / 24, deg("tR") / 24]); if (performance.now() - t0 < ms) requestAnimationFrame(f); else done(out); };
+  requestAnimationFrame(f);
+}), ms);
+// when each pedal starts a stroke (leaves the top); k is 1 for left, 2 for right
+const strokes = (trace, k) => trace.filter((f, i) => i && f[k] > 0.1 && trace[i - 1][k] <= 0.1).map((f) => f[0]);
+
+test("out of the box the treadle patterns pump: right then left a beat apart, every bar, from the first touch (D32)", async ({ page }) => {
+  await openOrgan(page, { quiet: false });
+  await expect(page.locator("#tempoOut")).toHaveText("100 bpm");
+  expect(await page.locator("#seqMeter").inputValue()).toBe("4/4");
+  expect(await page.locator("#seqBars").inputValue()).toBe("1");
+  expect(await page.locator("#seqTrigger").inputValue()).toBe("first");
+  await expect(page.locator("#helperOut")).toHaveText("2% · 0.01/s");
+  for (const id of ["left", "right"]) await expect(page.locator(`#seqLanes .seq-tab[data-lane="${id}"]`)).toHaveClass(/\bon\b/);
+  await expect(page.locator('#seqLanes .seq-tab[data-lane="left"]')).toHaveAttribute("aria-selected", "true");
+  await expect(page.locator("#seqAmountOut")).toHaveText("100% of a stroke");
+  expect(await notes(page)).toEqual(["Sweep up, Fast start, 1 sixteenth from bar 1, beat 2, 16th 1", "Sweep down, Fast start, 2 sixteenths from bar 1, beat 2, 16th 2"]);
+  await showLane(page, "right");
+  expect(await notes(page)).toEqual(["Sweep up, Fast start, 1 sixteenth from bar 1, beat 1, 16th 1", "Sweep down, Fast start, 2 sixteenths from bar 1, beat 1, 16th 2"]);
+  // nothing moves until the first touch (browsers allow no sound before one)
+  const before = await pedalTrace(page, 800);
+  expect(Math.max(...before.map((f) => Math.max(f[1], f[2])))).toBe(0);
+  await hold(page, "q");
+  const tr = await pedalTrace(page, 5300);
+  await letGo(page, "q");
+  const R = strokes(tr, 2), L = strokes(tr, 1);
+  expect(R.length).toBeGreaterThanOrEqual(2);
+  expect(L.length).toBeGreaterThanOrEqual(2);
+  expect(R[1] - R[0]).toBeCloseTo(2.4, 1);                    // one bar at 100 bpm
+  const gap = L.find((t) => t > R[0]) - R[0];
+  expect(gap).toBeGreaterThan(0.5); expect(gap).toBeLessThan(0.7);   // left a beat (0.6 s) after right
+  await expect(page.locator("#status")).toHaveText("Sequencer pumping");
+  // it keeps pumping between phrases
+  const after = await pedalTrace(page, 2600);
+  expect(strokes(after, 2).length).toBeGreaterThanOrEqual(1);
+});
+
+test("the treadle patterns hold the wind up for one note; turned off, a chord runs out (D32)", async ({ page }) => {
+  await openOrgan(page, { quiet: false });
+  await hold(page, "q");
+  await page.waitForTimeout(8000);
+  const held = await gaugeTrace(page, 4000);
+  await letGo(page, "q");
+  const v = held.map((f) => f[1]), mean = v.reduce((a, b) => a + b) / v.length;
+  expect(mean).toBeGreaterThan(3.0);                          // about 3.5″ (D22)
+  await stopPumping(page);
+  await hold(page, "q", "e", "t");                            // a three-note chord on the helper pump alone
+  await page.waitForTimeout(6000);
+  const out = await gaugeTrace(page, 500);
+  await letGo(page, "q", "e", "t");
+  expect(Math.max(...out.map((f) => f[1]))).toBeLessThan(1.0);
+});
+
+test("time signatures and bars: the grid follows them, and each bar keeps its notes (D32)", async ({ page }) => {
+  await setup(page, "right");
+  await expect(page.locator("#seqBars option")).toHaveText(["1 bar", "2 bars", "3 bars", "4 bars"]);
+  await page.selectOption("#seqBars", "2");
+  await cell(page, "up-linear", 17).click();                  // 4/4: bar 2, beat 1, its 2nd 16th
+  expect((await notes(page))[2]).toBe("Sweep up, Linear, 1 sixteenth from bar 2, beat 1, 16th 2");
+  await page.selectOption("#seqMeter", "3/4");                // the note keeps its place in bar 2
+  expect(await page.locator("#seqGrid .seq-cell").count()).toBe(8 * 24);
+  await expect(page.locator("#seqGrid .seq-beat")).toHaveText(["1.1", "2", "3", "2.1", "2", "3"]);
+  expect((await notes(page))[2]).toBe("Sweep up, Linear, 1 sixteenth from bar 2, beat 1, 16th 2");
+  await page.selectOption("#seqMeter", "6/8");                // eighth-note beats: two 16ths each
+  await expect(page.locator("#seqGrid .seq-beat")).toHaveText(["1.1", "2", "3", "4", "5", "6", "2.1", "2", "3", "4", "5", "6"]);
+  expect((await notes(page))[2]).toBe("Sweep up, Linear, 1 sixteenth from bar 2, beat 1, 16th 2");
+  await page.selectOption("#seqBars", "1");                   // one bar keeps what fits
+  expect(await notes(page)).toHaveLength(2);
+  expect(await page.locator("#seqGrid .seq-cell").count()).toBe(8 * 12);
+  await page.reload();
+  expect(await page.locator("#seqMeter").inputValue()).toBe("6/8");
+  expect(await page.locator("#seqBars").inputValue()).toBe("1");
+});
+
+test("a saved autoplay pattern and tempo become the treadle patterns, and an old sequencer pattern its lane (D32)", async ({ page }) => {
+  await page.addInitScript(() => {
+    if (localStorage.getItem("reed-seq")) return;
+    localStorage.setItem("reed-autoplay", JSON.stringify({ on: true, meter: "3/4", measures: 2, cells: ["R", "~", "L", "R", "-", "-"] }));
+    localStorage.setItem("reed-autoTempo", "80");
+    localStorage.setItem("reed-modseq", JSON.stringify({ on: true, target: "fan", bars: 1, trigger: "each", notes: [{ row: "up-s", start: 2, len: 4 }] }));
+    localStorage.setItem("reed-seqAmount", "40");
+  });
+  await openOrgan(page, { quiet: false });
+  await expect(page.locator("#tempoOut")).toHaveText("80 bpm");
+  expect(await page.locator("#seqMeter").inputValue()).toBe("3/4");
+  expect(await page.locator("#seqBars").inputValue()).toBe("2");
+  expect(await page.locator("#seqTrigger").inputValue()).toBe("each");
+  await showLane(page, "right");
+  expect(await notes(page)).toEqual([
+    "Sweep up, Fast start, 2 sixteenths from bar 1, beat 1, 16th 1", "Sweep down, Fast start, 5 sixteenths from bar 1, beat 1, 16th 3",   // a tied, slower stroke
+    "Sweep up, Fast start, 1 sixteenth from bar 2, beat 1, 16th 1", "Sweep down, Fast start, 2 sixteenths from bar 2, beat 1, 16th 2",
+  ]);
+  await showLane(page, "left");
+  expect(await notes(page)).toEqual(["Sweep up, Fast start, 1 sixteenth from bar 1, beat 3, 16th 1", "Sweep down, Fast start, 2 sixteenths from bar 1, beat 3, 16th 2"]);
+  await showLane(page, "fan");
+  await expect(page.locator("#seqOn")).toBeChecked();
+  await expect(page.locator("#seqAmountOut")).toHaveText("40% · 4.4 Hz");
+  expect(await notes(page)).toEqual(["Sweep up, S-curve, 4 sixteenths from bar 1, beat 1, 16th 3"]);
+});
+
+test("the treadle patterns rest while Direct wind is on and pump again when it's off (D32)", async ({ page }) => {
+  await openOrgan(page, { quiet: false });
+  await hold(page, "q"); await page.waitForTimeout(300); await letGo(page, "q");
+  await page.check("#directOn");
+  const resting = await pedalTrace(page, 2600);
+  expect(Math.max(...resting.slice(10).map((f) => Math.max(f[1], f[2])))).toBe(0);
+  await page.uncheck("#directOn");
+  const pumping = await pedalTrace(page, 2600);
+  expect(strokes(pumping, 2).length + strokes(pumping, 1).length).toBeGreaterThanOrEqual(1);
 });

@@ -146,6 +146,8 @@ These come from the owner's own feedback and apply to every change:
 
 ## D22. Pedal autoplay, on by default; helper pump 2%
 
+*Since D32, the pattern editor here is gone: Pedal autoplay is the modulation sequencer's two treadle patterns, with these defaults.*
+
 **Chosen:** a looping treadle pattern that presses and lifts the pedals through the same `gateOn`/`gateOff` as the player's feet, so each stroke uses that foot's envelope, the alternating-feet bonus, the hinge thump and the pedal animation. The pattern is a grid with one cell per beat of the meter (2/4, 3/4, 4/4, 5/4, 6/8; tempo counts the beat unit, so eighths in 6/8), 1 to 4 measures, 30 to 200 bpm. Each cell is Left, Right, Rest or Tie (holds the stroke before it; a tie at the start holds the loop's last stroke). A foot lifts a quarter of a beat (at most 120 ms) before its stroke ends, so repeated strokes on one foot stay separate. Autoplay starts with the audio, on the player's first touch, because browsers allow no sound before that. The owner's defaults: on, one bar of 4/4 at 100 bpm, right and left quarter notes on beats 1 and 2, a half-note rest; helper pump 2% (was 0%). The pattern and on/off are saved under `reed-autoplay`, the tempo under `reed-autoTempo`.
 **Why:** the owner asked for it, with these defaults. Driving the existing gates rather than adding a separate air source keeps everything the treadles already do, and lets the player's own feet join in. With autoplay on, the "Helper can't keep up" message is suppressed, because the gaps between strokes would make it flicker on every beat.
 **Measured** (wind gauge with default settings and stops, 24 s held, mean and range over the last 12 s): one note 3.5″ (3.3–3.6″); three-note chord 2.1″ (1.8–2.5″), so the strokes ripple the wind by about 0.7″; six-note chord 0.3″ (0.0–0.7″), running out of wind. With Right, Left, Right, Left at 120 bpm: three-note chord 3.6″, six-note chord 2.9″ (2.7–3.0″). With autoplay off and the helper at 2%, a three-note chord is out of wind within 5 s.
@@ -304,3 +306,50 @@ The Amount readout shows the chosen target's units: "25% · 0.9″", "25% · 2.8
 **Test change:** D30's First note / Each note test now checks ranges (2.2–2.6″ carrying on, 1.25–1.55″ restarted) instead of ±0.05″. The pattern climbs 0.9″ a second and the second key is pressed by a separate call a few tens of milliseconds after the first ends, so the old tolerance failed once in testing.
 
 **Test change (D29):** the Natural variation test failed about one run in six while testing this PR. The vibrato's wander is random on every page load, and a 4.2 s window sometimes caught a calm stretch, so the "natural" timing spread came out at only 1.6× the "machine" spread (the test required 2×). It now measures 6.5 s windows and checks a fixed line between the two. Over 16 runs, machine spread was 1.1–4.0 ms and natural 6.4–8.7 ms; the test requires under 5.0 ms and over 5.2 ms. The width check was already reliable and is unchanged. The vibrato itself is unchanged.
+
+## D32. Pedal autoplay folds into the modulation sequencer
+
+**Chosen:** Pedal autoplay is gone. The modulation sequencer takes its place in the Treadles section (no longer a drawer) and does its job, as the owner asked.
+- **Lanes:** there's now **a pattern for each thing it moves**: Left treadle, Right treadle, Direct wind, Fan speed and Knee swell, all playing together. A row of tabs picks which pattern the piano roll shows; a lit lamp on a tab means that pattern is playing. Each pattern has its own **Play this pattern** switch and its own **Amount**; Clear pattern clears the one on show.
+- **Shared settings:** **Tempo** (moved from autoplay, same store key `reed-autoTempo`), **Time** (2/4, 3/4, 4/4, 5/4 or 6/8; the tempo counts quarter notes, or eighths in 6/8, as autoplay did), **Length** (1–4 bars, as autoplay allowed) and **Starts on**. Changing the time or the number of bars keeps each bar's notes in place in their bar; notes that no longer fit go.
+- **The treadle patterns pump the organ:**
+  - A sweep up presses that pedal down and a sweep down lets it up. Amount is how far, as a share of a full stroke (100% by default).
+  - The air follows the pedal as it does for a foot, including the bonus for alternating feet and the hinge thump at the start of each stroke.
+  - Your own feet (treadles, arrow keys, Space) still work alongside; a pedal goes as far down as either of you pushes it. The per-foot envelope sliders now shape only your own presses.
+  - The pedals show the sequencer's strokes, and their readouts say "sequencer".
+- **The treadles run all the time.** As autoplay did, the treadle patterns start with the first touch and keep pumping between phrases. The other patterns still start on the first note of a phrase (or each note) and loop while keys are held. Each pass of every pattern starts from its control's own setting (a treadle's is "up").
+- **Direct wind and the treadles can't both supply the air.** The treadle patterns rest while Direct wind is on, starting again from beat 1 when it's turned off, as autoplay did (D26). Turning a treadle pattern on turns Direct wind off. Turning the Direct wind pattern on turns Direct wind on (so the treadles rest). The fan pattern draws the Vox Humana, as in D31.
+- **The status line** reads *Sequencer pumping* where it said *Autoplay pumping*. As before, it doesn't show "Helper can't keep up" while the treadles pump, because the gaps between strokes would make it flicker.
+
+**Defaults (D22 kept):** the treadle patterns are **on**, reproducing autoplay's default: one bar of 4/4 at 100 bpm, right on beat 1, left on beat 2, a half-note rest. A stroke is a Fast start sweep up over one 16th and a Fast start sweep down over the next two (`stroke()`), close to an autoplay stroke with the default foot envelope (60 ms attack, 300 ms decay). The Direct wind, fan and swell patterns are off, with the swell-up-and-back pattern from D30. Helper pump stays 2%.
+
+**Saved settings carry over** (`migrateSaved`, used once, when nothing is saved under the new key `reed-seq`):
+- A saved autoplay pattern becomes the treadle patterns: its time, bars and on/off, with a stroke for each Left or Right beat. A tie makes that stroke longer and slower: a quarter of its length pressing, the rest letting up, with a 16th to spare.
+- A saved D30/D31 sequencer pattern becomes the lane it moved, with its on/off, its Amount and its Starts on. It was always 4/4, so it's placed bar by bar in the new time.
+- The old keys (`reed-autoplay`, `reed-modseq`, `reed-seqAmount`) are left alone.
+
+**Why:** the owner asked for Pedal autoplay to fold into the sequencer, with either treadle a modulation target, the tempo and time signatures in the sequencer, and old tests cleaned up. Their choices on the open questions:
+- A pattern per target, played together, because pumping needs both feet, and the swell or fan should be able to move while the treadles pump.
+- The treadle patterns on by default, so the organ pumps out of the box as it did.
+- The treadles running all the time.
+- The sequencer living where autoplay was.
+
+**Measured** (default settings, helper 2%; wind gauge, mean and range over 12 s after 12 s held; D22's autoplay figures in brackets):
+
+| What | Result |
+| --- | --- |
+| One note | 3.49″, 3.29–3.60 (autoplay: 3.5″, 3.3–3.6) |
+| Three-note chord | 2.46″, 2.06–2.86 (autoplay: 2.1″, 1.8–2.5). A sequencer stroke gives about 10% more air than an autoplay stroke, so this holds slightly higher |
+| Six-note chord | 0.30″, 0.00–0.76, running out (autoplay: 0.3″, 0.0–0.7) |
+| Timing | Right strokes 2.4 s apart (one bar at 100 bpm), left 0.6 s after right |
+
+**Tests removed and replaced:**
+- `tests/autoplay.spec.js` and the three D22 unit tests are removed with `js/autoplay.js` and `js/core/autoplay.js`.
+- What they checked is now checked on the treadle patterns in `tests/modseq.spec.js`: the defaults, waiting for the first touch, right then left a beat apart every bar, pumping between phrases, holding the wind for one note and running out with the patterns off, and resting under Direct wind.
+- New tests cover the time signatures and bars, and carrying over a saved autoplay pattern and tempo and an old sequencer pattern.
+- The quiet test setup now turns the two treadle patterns off (`stopPumping`) instead of unticking autoplay.
+- The D30/D31 tests choose a lane where they chose a target. The D30 timing and loading unit tests are replaced by D32 ones for time signatures, defaults, strokes, reshaping and carrying over saved settings.
+
+**Planted bugs:** each of these was caught: the treadles pumping only while keys are held, the treadles pumping under Direct wind, sequencer strokes giving no air, a saved autoplay pattern ignored, bars not keeping their notes when the time changes, and a treadle pattern not turning Direct wind off.
+
+**Supersedes:** D22's pattern editor (beats of Left, Right, Rest, Tie). Its defaults and behaviour live on as the treadle patterns.
