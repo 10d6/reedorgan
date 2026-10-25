@@ -2,8 +2,10 @@
 // pointer, computer keys and MIDI.
 
 import { S, stops, voices, splitNote, store } from './state.js';
-import { initAudio, noteOn, noteOff, silenceAll, unscoop, applyBend, ctx } from './audio.js';
-import { scoopDepth, isTop, CHORD_WINDOW } from './core/expression.js';
+import { initAudio, noteOn, noteOff, silenceAll, unscoop, dropVibrato, applyBend, ctx } from './audio.js';
+import { scoopDepth, scoopDuration, isTop, delayFromCC, CHORD_WINDOW, KEY_VELOCITY } from './core/expression.js';
+import { speechTime } from './core/speech.js';
+import { noteFreq } from './core/ranks.js';
 import { ctl } from './controls.js';
 import { ped, gateOn, gateOff } from './treadles.js';
 
@@ -68,7 +70,9 @@ const couplesFor = m => [m, ...(stops.sub ? [m - 12] : []), ...(stops.sup ? [m +
 // milliseconds apart in any order, so a lower note can be the top voice for an
 // instant; when a higher one follows within CHORD_WINDOW, the lower note was part
 // of the chord, gives up its scoop, and doesn't count as the melody's last note.
-let topKey = null, topAt = -Infinity, topBefore = null, topSet = null;
+// With vibrato on the top voice (D29), each new top note takes the vibrato over
+// from the last one, whose vibrato fades away (vibSet holds its notes).
+let topKey = null, topAt = -Infinity, topBefore = null, topSet = null, vibSet = null;
 function expressionFor(m, velocity) {
   const held = [...coupled.keys()].filter(k => k !== m), now = performance.now() / 1000;
   const top = isTop(m, held);
@@ -77,15 +81,20 @@ function expressionFor(m, velocity) {
     prev = topBefore;
     if (topSet) unscoop(topSet);
   }
-  const cents = scoopDepth({ mode: S.scoopMode, depth: ctl.scoopDepth.value, m, held, lastTop: prev, velocity });
+  const cents = scoopDepth({ mode: S.scoopMode, depth: ctl.scoopDepth.value, m, held, lastTop: prev, velocity, crossover: ctl.scoopCross.value });
   if (top) { topBefore = prev; topKey = m; topAt = now; topSet = null; }
-  return { cents, time: ctl.scoopTime.value, curve: S.scoopCurve, top };
+  // the scoop lands when the played key's 8′ reed is at full voice, if that's later
+  const dur = scoopDuration(ctl.scoopTime.value, speechTime(noteFreq(m), S.pressure, ctl.speech.value));
+  const vib = ctl.vibDepth.value > 0 && (S.vibMode === 'all' || top);
+  return { cents, dur, curve: S.scoopCurve, top, vib };
 }
-// Every coupled octave of a key gets the same Expression, so they bend together.
-export function press(m, velocity = 100) {
+// Every coupled octave of a key gets the same Expression, so they move together.
+export function press(m, velocity = KEY_VELOCITY) {
   const set = couplesFor(m), ex = expressionFor(m, velocity);
+  if (ex.top && S.vibMode === 'top' && vibSet) { dropVibrato(vibSet); vibSet = null; }
   set.forEach(n => noteOn(n, ex));
   if (ex.top && (S.scoopMode === 'top' || S.scoopMode === 'leaps')) topSet = set;
+  if (ex.top && ex.vib) vibSet = set;
   if (!coupled.has(m)) coupled.set(m, []); coupled.get(m).push(set);
 }
 export function release(m) {
@@ -103,18 +112,29 @@ export function recouple() {
 }
 
 /* ---------- MIDI ---------- */
-let midiAccess = null, sustain = false, midiBtn, midiStatus, learnBtn, ccOut, learning = false;
+let midiAccess = null, sustain = false, midiBtn, midiStatus, learning = null;   // learning: null, 'direct' or 'vib'
 const midiHeld = new Set(), sustained = new Set();
 const kbHeld = new Set(), ptrs = new Map();   // computer keys and pointers holding notes
 
-// Binds Direct wind to MIDI control `cc` and ends learning.
-function setDirectCC(cc) {
-  S.directCC = cc; store.set('directCC', cc); learning = false; showCC();
+// MIDI Learn: Direct wind (D27) and Vibrato delay (D29) each bind whichever
+// control moves next. `key` is the S field and storage key, `out` and `btn` its
+// readout and Learn button, `none` the readout when nothing is bound.
+const CC_NAMES = { 1: 'mod wheel', 2: 'breath', 4: 'foot pedal', 7: 'volume knob', 11: 'expression pedal' };
+const LEARN = {
+  direct: { key: 'directCC', out: 'directCC', btn: 'directLearn' },
+  vib: { key: 'vibCC', out: 'vibCC', btn: 'vibLearn', clear: 'vibForget', none: 'No controller' },
+};
+function setLearned(target, cc) {
+  const L = LEARN[target]; S[L.key] = cc; store.set(L.key, cc); learning = null; showCC();
 }
 function showCC() {
-  ccOut.textContent = learning ? 'Move a knob or slider…' : 'MIDI CC' + S.directCC + (S.directCC === 7 ? ' (volume knob)' : '');
-  learnBtn.textContent = learning ? 'Cancel' : 'Learn';
-  learnBtn.classList.toggle('attention', learning);
+  for (const [target, L] of Object.entries(LEARN)) {
+    const cc = S[L.key], on = learning === target, btn = document.getElementById(L.btn);
+    document.getElementById(L.out).textContent = on ? 'Move a knob or slider…' : cc == null ? L.none : 'MIDI CC' + cc + (CC_NAMES[cc] ? ` (${CC_NAMES[cc]})` : '');
+    btn.textContent = on ? 'Cancel' : 'Learn';
+    btn.classList.toggle('attention', on);
+    if (L.clear) document.getElementById(L.clear).hidden = cc == null || on;
+  }
 }
 
 /* ---------- all notes off (D18) ---------- */
@@ -123,7 +143,7 @@ function showCC() {
 // button, Escape, and MIDI all-notes-off.
 export function allNotesOff() {
   kbHeld.clear(); ptrs.clear(); midiHeld.clear(); sustained.clear(); coupled.clear();
-  topKey = topBefore = topSet = null; topAt = -Infinity;
+  topKey = topBefore = topSet = vibSet = null; topAt = -Infinity;
   silenceAll();
 }
 function setMidi(msg, cls) { midiStatus.textContent = msg; midiStatus.className = 'midi-status' + (cls ? ' ' + cls : ''); }
@@ -166,8 +186,10 @@ function onMidi(ev) {
     // Direct wind's MIDI control (D27): Learn binds the next control moved;
     // while Direct wind is on, that control (CC7, the volume knob, unless
     // learned otherwise) sets the wind before any other use of it.
-    if (learning && d1 < 120) { setDirectCC(d1); return; }
+    if (learning && d1 < 120) { setLearned(learning, d1); return; }
     if (S.directWind && d1 === S.directCC) { ctl.directAir.set(Math.round(d2 / 127 * 36)); return; }
+    // a control learned for Vibrato delay (D29): down is Never, up is no delay
+    if (S.vibCC != null && d1 === S.vibCC) { ctl.vibDelay.set(delayFromCC(d2)); return; }
     if (d1 === 64) {
       sustain = d2 >= 64;
       if (!sustain) { sustained.forEach(release); sustained.clear(); }
@@ -248,11 +270,13 @@ export function setupKeys() {
   /* MIDI */
   midiBtn = document.getElementById('midiBtn'); midiStatus = document.getElementById('midiStatus');
   midiBtn.classList.add('attention');
-  learnBtn = document.getElementById('directLearn'); ccOut = document.getElementById('directCC');
-  learnBtn.addEventListener('click', () => {
-    learning = !learning; showCC();
-    if (learning && !midiAccess) connectMidi();   // learning needs MIDI, so connect if we haven't
-  });
+  for (const [target, L] of Object.entries(LEARN)) {
+    document.getElementById(L.btn).addEventListener('click', () => {
+      learning = learning === target ? null : target; showCC();
+      if (learning && !midiAccess) connectMidi();   // learning needs MIDI, so connect if we haven't
+    });
+    if (L.clear) document.getElementById(L.clear).addEventListener('click', () => setLearned(target, null));
+  }
   showCC();
   midiBtn.addEventListener('click', connectMidi);
 }

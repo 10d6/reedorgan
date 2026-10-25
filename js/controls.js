@@ -5,8 +5,9 @@ import { RANKS } from './core/ranks.js';
 import { retime } from './autoplay.js';
 import { HELPER_MAX, GMAX } from './core/wind.js';
 import { volumeGain, bassCutHz } from './core/output.js';
+import { VIB_DELAY_MAX } from './core/expression.js';
 import { S, store } from './state.js';
-import { initAudio, applyStops, applyVox, applyMix, applyOutput, applyBend, setFanShape, retune, rewind, revoice, updateComp, ctx } from './audio.js';
+import { initAudio, applyStops, applyVox, applyMix, applyOutput, applyBend, applyVibrato, setFanShape, retune, rewind, revoice, updateComp, ctx } from './audio.js';
 
 // Filled in by setupControls(). Each slider is {el, value, set(v)}; `value` is
 // already mapped to what the sound uses (see bindSlider).
@@ -155,10 +156,22 @@ export function setupControls() {
   ctl.scoopDepth = bindSlider('scoopDepthAmt', 'scoopDepth', 0, v => v === 0 ? 'Off' : v === 100 ? 'a semitone' : v === 200 ? 'a whole tone' : v + ' ¢');
   ctl.scoopTime = bindSlider('scoopTimeAmt', 'scoopTime', 120, v => v + ' ms', null, v => v / 1000);
   ctl.bendRange = bindSlider('bendRangeAmt', 'bendRange', 2, v => v === 0 ? 'Off' : '±' + v + (v === 1 ? ' semitone' : ' semitones'), () => applyBend());
-  [['scoopMode', 'scoopMode'], ['scoopCurve', 'scoopCurve']].forEach(([id, key]) => {
+  // the accent trigger's velocity threshold (D29); only used by that trigger
+  ctl.scoopCross = bindSlider('scoopCrossAmt', 'scoopCross', 90, v => 'velocity ' + v);
+  const syncCross = () => { ctl.scoopCross.el.disabled = S.scoopMode !== 'accent'; };
+  /* ---- delayed vibrato (D29), off by default ---- */
+  const fmtMs = v => v < 1000 ? v + ' ms' : (v / 1000).toFixed(2) + ' s';
+  ctl.vibDepth = bindSlider('vibDepthAmt', 'vibDepth', 0, v => v === 0 ? 'Off' : '±' + v + ' ¢', () => applyVibrato());
+  ctl.vibRate = bindSlider('vibRateAmt', 'vibRate', 5.5, v => (+v).toFixed(1) + ' Hz', () => applyVibrato());
+  ctl.vibDelay = bindSlider('vibDelayAmt', 'vibDelay', 400, v => v >= VIB_DELAY_MAX ? 'Never' : fmtMs(v), () => applyVibrato());
+  ctl.vibFade = bindSlider('vibFadeAmt', 'vibFade', 500, v => v === 0 ? 'At once' : fmtMs(v), () => applyVibrato(), v => v / 1000);
+  ctl.vibNatural = bindSlider('vibNaturalAmt', 'vibNatural', 50, v => v === 0 ? 'Off' : v + '%', () => applyVibrato(), v => v / 100);
+  ctl.vibColour = bindSlider('vibColourAmt', 'vibColour', 30, v => v === 0 ? 'Off' : v + '%', () => applyVibrato(), v => v / 100);
+  [['scoopMode', 'scoopMode'], ['scoopCurve', 'scoopCurve'], ['vibMode', 'vibMode']].forEach(([id, key]) => {
     const el = $(id); el.value = S[key];
-    el.addEventListener('change', () => { S[key] = el.value; store.set(key, S[key]); });
+    el.addEventListener('change', () => { S[key] = el.value; store.set(key, S[key]); syncCross(); });
   });
+  syncCross();
   const exprPanel = $('exprPanel');
   exprPanel.open = store.get('exprOpen', false);
   exprPanel.addEventListener('toggle', () => store.set('exprOpen', exprPanel.open));

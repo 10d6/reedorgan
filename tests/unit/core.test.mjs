@@ -8,7 +8,7 @@ import { reedRand, reedTri, reedError, reedWindResponse, lockReeds } from "../..
 import { windLevel, windBright, windCents, windDrain, EASY_REEDS, KNEE, P_REF, gaugeInches, toTime, toSlider, fmtT, stepEnvelope, DEFAULT_ENV } from "../../js/core/wind.js";
 import { fanWaveCoefficients } from "../../js/core/fan.js";
 import { METERS, DEFAULT_PATTERN, normalise, reshape, nextCell, cellSeconds, noteAt, pedalsAt, liftGap } from "../../js/core/autoplay.js";
-import { scoopShape, scoopValue, scoopCurve, scoopDuration, scoopDepth, isTop, bendCents, SCOOP_CURVES, LEAP } from "../../js/core/expression.js";
+import { scoopShape, scoopValue, scoopCurve, scoopDuration, scoopDepth, isTop, bendCents, SCOOP_CURVES, LEAP, KEY_VELOCITY, VIB_DELAY_MAX, vibDelaySec, delayFromCC, vibStart, vibFadeCurve, vibStartRate, wanderCurve } from "../../js/core/expression.js";
 import { volumeGain, bassCutHz, limiterMakeupDb, softClip, softClipCurve } from "../../js/core/output.js";
 
 const near = (a, b, tol, msg) => assert.ok(Math.abs(a - b) <= tol, `${msg ?? ""} expected ${b} ± ${tol}, got ${a}`);
@@ -252,7 +252,7 @@ test("D28: the scoop lands exactly on pitch with no kink, from the full depth be
     assert.equal(scoopShape(1, c), 0, c);
     assert.equal(scoopShape(2, c), 0, `${c} stays on pitch after it lands`);
     for (let x = 0; x < 1; x += .01) assert.ok(scoopShape(x + .01, c) <= scoopShape(x, c) + 1e-12, `${c} only rises toward the note`);
-    near(scoopShape(.995, c), 0, 1e-3, `${c} arrives with zero slope`);
+    if (c !== "snap") near(scoopShape(.995, c), 0, 1e-3, `${c} arrives with zero slope`);
     const curve = scoopCurve(100, c);
     near(curve[0], -100, 1e-6, c); assert.equal(curve[curve.length - 1], 0, c);
   }
@@ -293,4 +293,55 @@ test("D28: the pitch wheel spans exactly the bend range each way", () => {
   near(bendCents(0, 0, 2), -200, 1e-9);
   near(bendCents(0, 96, 12), 600, 1);
   assert.equal(bendCents(127, 127, 0), 0);
+});
+
+test("D29: Late snap holds below longest and arrives at its fastest", () => {
+  // halfway through it is still 7/8 of the way below; the others are at 1/4 and 1/2
+  near(scoopShape(.5, "snap"), .875, 1e-9);
+  for (const x of [.25, .5, .75]) for (const c of ["ease", "smooth"]) assert.ok(scoopShape(x, "snap") > scoopShape(x, c), `below ${c} at ${x}`);
+  const speed = (x) => (scoopShape(x - .01, "snap") - scoopShape(x, "snap")) / .01;
+  assert.ok(speed(1) > speed(.75) && speed(.75) > speed(.5) && speed(.5) > speed(.25), "keeps speeding up");
+  near(speed(1), 3, .05, "lands at three times the average speed");
+});
+
+test("D29: Accents scoop the full depth at or past the crossover, nothing below it", () => {
+  const base = { mode: "accent", depth: 100, m: 60, held: [72], lastTop: null, crossover: 90 };
+  assert.equal(scoopDepth({ ...base, velocity: 90 }), 100);
+  assert.equal(scoopDepth({ ...base, velocity: 127 }), 100);
+  assert.equal(scoopDepth({ ...base, velocity: 89 }), 0);
+  assert.equal(scoopDepth({ ...base, velocity: 1 }), 0);
+  assert.equal(scoopDepth({ ...base, velocity: KEY_VELOCITY }), 100, "keys and mouse count as 100");
+  assert.equal(scoopDepth({ ...base, velocity: KEY_VELOCITY, crossover: 101 }), 0);
+});
+
+test("D29: the vibrato delay, its controller and when it starts", () => {
+  assert.equal(vibDelaySec(400), .4);
+  assert.equal(vibDelaySec(VIB_DELAY_MAX), Infinity, "the top of the slider is Never");
+  assert.equal(delayFromCC(0), VIB_DELAY_MAX, "controller down: Never");
+  assert.equal(delayFromCC(127), 0, "controller up: no delay");
+  for (let cc = 0; cc < 127; cc++) assert.ok(delayFromCC(cc + 1) <= delayFromCC(cc), "pushing it up never lengthens the delay");
+  assert.equal(delayFromCC(64) % 50, 0);
+  near(vibStart(1, .4, 0), 1.4, 1e-12, "counted from the landing");
+  assert.equal(vibStart(1, .4, 2), 2, "a delay already over starts now");
+  assert.equal(vibStart(1, Infinity, 0), Infinity);
+});
+
+test("D29: the vibrato fades in on an S-curve and starts slower with natural variation", () => {
+  const c = vibFadeCurve();
+  assert.equal(c[0], 0); assert.equal(c[c.length - 1], 1);
+  for (let k = 1; k < c.length; k++) assert.ok(c[k] >= c[k - 1]);
+  assert.ok(c[1] < .01 && c[c.length - 2] > .99, "gentle at both ends");
+  assert.equal(vibStartRate(5, 0), 5);
+  near(vibStartRate(5, 1), 4, 1e-12);
+});
+
+test("D29: the wander curve is smooth, stays within ±1 and loops", () => {
+  let seed = 1; const rand = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const w = wanderCurve(20, 3000, .45, rand);
+  assert.equal(w.length, 60000);
+  let jump = 0; for (let i = 1; i < w.length; i++) jump = Math.max(jump, Math.abs(w[i] - w[i - 1]));
+  assert.ok(w.every((x) => x >= -1 && x <= 1));
+  assert.ok(jump < .005, `largest step ${jump}`);
+  assert.ok(Math.abs(w[w.length - 1] - w[0]) < .005, "the end meets the start");
+  assert.ok(Math.max(...w) - Math.min(...w) > 1, "it really wanders");
 });

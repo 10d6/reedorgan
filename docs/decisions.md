@@ -216,3 +216,33 @@ These come from the owner's own feedback and apply to every change:
 **Tests:** `tests/expression.spec.js` (9 tests), and four unit tests. Each was confirmed to catch a planted bug: an exponential tail instead of the curve, coupled octaves not scooping with their key, and no chord window. The new file passed 4 out of 4 repeated runs.
 
 **Revisit if:** the owner wants more gestures from the same drawer: harmonica-style breath bends (Direct wind or CC2 bending down by up to a semitone or more), MPE per-note bends, delayed vibrato on the top voice, falls at release, or adaptive just intonation for held chords (a temperament change, so only if asked).
+
+## D29. Accents, Late snap, and delayed vibrato
+
+**Chosen:** three additions to the Expression drawer (D28), all off by default, so the organ sounds as before. The drawer is now grouped as Scoop, Vibrato and Wheels.
+- **Accents, past Crossover** (a new *Scoop on* choice): a note struck at or past the **Crossover** velocity (1–127, default 90; `reed-scoopCross`) scoops the full depth; a softer one doesn't scoop at all. Mouse and computer keys count as velocity 100 (`KEY_VELOCITY`). The Crossover slider is greyed out unless Accents is chosen.
+- **Late snap** (a new *Curve*): 1 − x³. It holds below longest (halfway through it is still 7/8 of the way down, against 1/4 for Ease in and 1/2 for S-curve) and speeds up all the way into the note, arriving at three times its average speed: a deliberate flick, where the other two curves settle in with zero slope. It still lands exactly on pitch.
+- **Delayed vibrato**: **Vibrato** width (0–±100 ¢, default Off; `reed-vibDepth`), **Rate** (3–8 Hz, default 5.5), **Delay** (0–2.5 s, default 400 ms; the top of the slider is Never), **Fade in** (0–1.5 s, default 500 ms, an S-curve), **Vibrato on** (*Top voice*, default, or *Every note*), **Natural variation** (default 50%), **Voice colour** (default 30%), and **Delay control**: Learn binds any MIDI control to the delay (`reed-vibCC`, none by default), Clear unbinds it.
+
+**How:** each voice that gets vibrato owns a sine LFO → an envelope gain (0 through the delay, then the fade-in curve to 1) → a width gain in cents into all five reeds' `detune`, and → a colour gain in dB into each reed's tone shelf. The delay counts from when the note *lands*: the end of its scoop, or note-on without one. Coupled octaves of a key start identical LFOs at the same instant with the same automation, so they stay in phase. Two slowly wandering buffers (`wanderCurve`: random points 0.45 s and 0.6 s apart joined by cosine curves, looped) are shared by every voice and feed each voice's LFO rate and width.
+
+**Why these qualities:** the owner asked for delayed vibrato with the delay set by hand or by a controller, and for other natural, voice-like qualities that are easy to emulate. Each one is cheap and audible:
+- **Delay, then a gradual fade-in.** This is what a singer does: short notes in a quick passage get no vibrato, long notes bloom into it. Counting from the landing means a scooped note arrives, settles, and only then starts to sing.
+- **It starts slow and speeds up.** At Natural variation 100% the rate starts 20% slow and reaches the set rate during the fade-in.
+- **Rate and width wander.** A voice's vibrato isn't a fixed sine wave; its cycles vary slightly in length and width. At 100% the rate wanders by up to ±8% and the width by up to ±25%. A perfectly regular vibrato is what makes electronic vibrato sound electronic.
+- **The colour moves with the pitch.** In a voice, as the pitch rises and falls the harmonics slide across the fixed resonances of the throat and mouth, so the tone brightens and darkens with each cycle. Here Voice colour moves each reed's upper harmonics by up to ±4 dB, in step with the pitch, through the tone shelf each reed already has (D17).
+- **It follows the melody.** With *Top voice*, each new top note takes the vibrato over, and the old top note's vibrato fades away in about 150 ms, so one voice sings over the accompaniment instead of a choir of wobbling inner notes.
+- **Controller direction.** A learned controller all the way down is Never and all the way up is no delay, so pushing it up brings the vibrato in sooner. A note already held that hasn't started its vibrato is rescheduled from its own landing time, so pushing the controller up while holding a note brings vibrato in on that note. Setting the Delay slider to Never and using the controller makes it a hand-played "vibrato now" control. As with Direct wind's Learn (D27), the move that binds a control doesn't also set the value. A learned control takes precedence over its usual job: learn the mod wheel and it moves the delay instead of setting Scoop.
+
+**Fix (from D28):** a scoop's length was worked out per voice from that voice's own speech time, so on low keys a coupled octave could land at a different moment from the played key and the two pitches came apart briefly. It's now worked out once, for the played key, and shared. Measured on C2 with the Super Octave coupler (Scoop 200 ¢, 40 ms), the worst moment's pitch clarity goes from 0.966 to 0.989.
+
+**Measured** (Melodia A3 alone unless noted; Reed scatter, Pitch drift, Speech glide and Tone bloom at 0; pitch by autocorrelation of the speaker output):
+- Vibrato ±40 ¢ with the default delay and fade-in: within 1 ¢ of the note for the first 0.4 s, then growing; ±39 ¢ from about 1.05 s on, at 5.49 Hz (set 5.5).
+- Natural variation 0 → 100%: the spread of cycle lengths goes from 2.3 ms (the tracker's own noise) to 8.4 ms; the width over successive 0.4 s stretches is a steady 39 ¢ at 0%, and wanders between 32 and 43 ¢ at 100%.
+- Voice colour 0 → 100% (Diapason A3, ±40 ¢): treble (above 2 kHz) flicker 1.7 → 9.5 dB, overall level 0.1 → 3.1 dB, bass 0.05 → 1.4 dB.
+- Coupled octaves (Super Octave, ±80 ¢, Natural variation 100%): the sound stays one clear pitch, with median clarity above 0.98.
+- Off by default: all 67 browser tests from before pass unchanged.
+
+**Tests:** 11 new browser tests in `tests/expression.spec.js` and 5 unit tests. Each of these planted bugs was caught: coupled octaves' vibratos out of phase, no handover to a new top voice, a controller unable to reschedule a held note, the delay counted from note-on instead of from the landing, and Late snap falling back to Ease in.
+
+**Revisit if:** the owner wants channel aftertouch to deepen the vibrato (natural on keyboards that have it), a choice of vibrato below the note rather than around it (string-style), vibrato rate that rises slightly towards the end of a long note, or harmonica-style breath bends.
