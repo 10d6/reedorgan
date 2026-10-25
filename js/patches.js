@@ -12,6 +12,14 @@
 
 import { store } from './state.js';
 import { PATCH_VERSION, FACTORY, cleanName, uniqueName, sortNames, sameSettings, normaliseLibrary, patchFile, fileName, readPatchFile } from './core/patches.js';
+import { BUILT_IN } from './core/presets.js';
+
+// The patches that come with the organ (D34): Factory, then the built-in
+// voices. Like Factory, they can't be overwritten, renamed or deleted, and
+// their names can't be taken by your own patches.
+const BUILT_INS = [FACTORY, ...Object.keys(BUILT_IN)];
+const isBuiltIn = name => BUILT_INS.includes(name);
+const settingsOf = name => name === FACTORY ? {} : BUILT_IN[name] || (lib[name] && lib[name].settings);
 
 const fields = [];           // {key, def, get, set, ok, legacy}, in the order they're applied
 let lib = {};                // {name: {version, settings}}
@@ -53,9 +61,9 @@ function apply(settings) {
 const saveLib = () => store.set('patches', lib);
 const remember = name => { current = name; store.set('patch', name === FACTORY ? null : name); };
 function load(name) {
-  const p = name !== FACTORY && lib[name];
-  apply(p ? p.settings : {});
-  remember(p ? name : FACTORY);
+  const s = settingsOf(name), ok = !!s;
+  apply(ok ? s : {});
+  remember(ok ? name : FACTORY);
   render();
 }
 function saveAs(name) {
@@ -66,9 +74,11 @@ function saveAs(name) {
 
 /* ---------- the patch bar ---------- */
 function render() {
-  selEl.replaceChildren(...[FACTORY, ...sortNames(Object.keys(lib))].map(n => new Option(n, n)));
+  const group = (label, names) => { const g = document.createElement('optgroup'); g.label = label; g.append(...names.map(n => new Option(n, n))); return g; };
+  const mine = sortNames(Object.keys(lib));
+  selEl.replaceChildren(group('Built in', BUILT_INS), ...(mine.length ? [group('Your patches', mine)] : []));
   selEl.value = current;
-  const factory = current === FACTORY;
+  const factory = isBuiltIn(current);   // Factory and the built-in voices can't be overwritten: use Save as…
   buttons.save.disabled = factory;          // Factory can't be overwritten: use Save as…
   buttons.rename.disabled = factory;
   buttons.del.disabled = factory;
@@ -91,13 +101,13 @@ function ask(mode) {
   nameEl.hidden = mode === 'delete';
   if (mode === 'delete') { askLabel.textContent = `Delete “${current}”?`; okEl.textContent = 'Delete'; okEl.disabled = false; okEl.focus(); return; }
   askLabel.textContent = mode === 'rename' ? 'New name' : 'Save as';
-  nameEl.value = mode === 'rename' || current !== FACTORY ? current : '';
+  nameEl.value = mode === 'rename' || !isBuiltIn(current) ? current : '';
   syncAsk(); nameEl.focus(); nameEl.select();
 }
 function syncAsk() {
   const n = cleanName(nameEl.value), taken = n in lib && n !== current;
-  if (askMode === 'rename') { okEl.textContent = 'Rename'; okEl.disabled = !n || n === FACTORY || taken; }
-  else { okEl.textContent = n in lib ? 'Replace' : 'Save'; okEl.disabled = !n || n === FACTORY; }
+  if (askMode === 'rename') { okEl.textContent = 'Rename'; okEl.disabled = !n || isBuiltIn(n) || taken; }
+  else { okEl.textContent = n in lib ? 'Replace' : 'Save'; okEl.disabled = !n || isBuiltIn(n); }
 }
 function closeAsk() { askEl.hidden = true; askMode = null; }
 function submitAsk() {
@@ -106,7 +116,7 @@ function submitAsk() {
   if (mode === 'delete') {
     const gone = current; delete lib[gone]; saveLib(); load(FACTORY); say(`Deleted “${gone}”.`); return;
   }
-  if (!n || n === FACTORY) return;
+  if (!n || isBuiltIn(n)) return;
   if (mode === 'rename') {
     if (n !== current && !(n in lib)) { lib[n] = lib[current]; delete lib[current]; saveLib(); remember(n); render(); say(`Renamed to “${n}”.`); }
     return;
@@ -124,7 +134,7 @@ function download() {
 async function loadFile(file) {
   try {
     const { name, settings } = readPatchFile(await file.text());
-    const n = uniqueName(name, Object.keys(lib));
+    const n = uniqueName(name, [...Object.keys(lib), ...BUILT_INS]);
     lib[n] = { version: PATCH_VERSION, settings }; saveLib();
     load(n); say(`Loaded “${n}” from the file.`);
   } catch (e) { say(e.message); }
@@ -160,12 +170,22 @@ export function setupPatches() {
 
   carryOver();
   lib = normaliseLibrary(store.get('patches', {}));
+  // A patch of your own with a built-in voice's name (you may have made the
+  // voice yourself before it came with the organ): an identical copy is
+  // dropped, as it's now built in; a different one is kept under a new name.
+  let renamed = false;
+  for (const name of Object.keys(lib)) {
+    if (!isBuiltIn(name)) continue;
+    const mine = lib[name]; delete lib[name]; renamed = true;
+    if (!sameSettings(mine.settings, BUILT_IN[name])) lib[uniqueName(name, [...Object.keys(lib), ...BUILT_INS])] = mine;
+  }
+  if (renamed) saveLib();
   const start = store.get('patch', null);
-  load(start && lib[start] ? start : FACTORY);
+  load(start && settingsOf(start) ? start : FACTORY);
   say('');
 
   selEl.addEventListener('change', () => { closeAsk(); load(selEl.value); say(''); });
-  buttons.save.addEventListener('click', () => { if (current !== FACTORY) saveAs(current); });
+  buttons.save.addEventListener('click', () => { if (!isBuiltIn(current)) saveAs(current); });
   buttons.saveAs.addEventListener('click', () => ask('saveAs'));
   buttons.rename.addEventListener('click', () => ask('rename'));
   buttons.del.addEventListener('click', () => ask('delete'));

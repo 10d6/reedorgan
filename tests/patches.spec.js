@@ -1,16 +1,21 @@
 // Patches (D33): the sound saved by name. Nothing about the sound saves itself;
 // the organ opens with the patch last loaded or saved; Factory is built in;
-// patches go to files and come back; old automatic settings carry over.
+// patches go to files and come back; old automatic settings carry over; the
+// built-in voices (D34) come with it.
 import { test, expect } from "@playwright/test";
 import { openOrgan, setSlider, savePatch, toggleStop, hold, letGo } from "./organ.js";
+import { readFileSync } from "node:fs";
 
 const options = (page) => page.$$eval("#patchSel option", (els) => els.map((e) => e.value));
+const BUILT_IN = ["Factory", "Lay Still", "Reed Choir", "Vocal Lead"];   // the patches that come with the organ (D34)
+// The patches in the menu under "Your patches".
+const mine = (page) => page.$$eval('#patchSel optgroup[label="Your patches"] option', (els) => els.map((e) => e.value));
 const stopOn = (page, label) => page.getByRole("button", { name: label, exact: true });
 
 test("out of the box: Factory, nothing edited; a change shows as edited and Revert undoes it (D33)", async ({ page }) => {
   await openOrgan(page, { quiet: false });
   await expect(page.locator("#patchSel")).toHaveValue("Factory");
-  expect(await options(page)).toEqual(["Factory"]);
+  expect(await options(page)).toEqual(BUILT_IN);
   await expect(page.locator("#patchEdited")).toBeHidden();
   for (const id of ["patchSave", "patchRename", "patchDelete", "patchRevert"]) await expect(page.locator("#" + id)).toBeDisabled();   // Factory can't be overwritten
   await setSlider(page, "swellAmt", 40);
@@ -123,16 +128,16 @@ test("Save as, Rename and Delete: names stay unique, Factory is protected (D33)"
   await expect(page.locator("#patchOk")).toBeDisabled();               // can't rename onto another patch
   await page.fill("#patchName", "Full choir");
   await page.click("#patchOk");
-  expect(await options(page)).toEqual(["Factory", "Evening hymn", "Full choir"]);
+  expect(await mine(page)).toEqual(["Evening hymn", "Full choir"]);
   await expect(page.locator("#patchSel")).toHaveValue("Full choir");
   await page.click("#patchDelete");
   await expect(page.locator("#patchAskLabel")).toHaveText("Delete “Full choir”?");
   await page.click("#patchOk");
-  expect(await options(page)).toEqual(["Factory", "Evening hymn"]);
+  expect(await mine(page)).toEqual(["Evening hymn"]);
   await expect(page.locator("#patchSel")).toHaveValue("Factory");
   await expect(page.locator("#swellOut")).toHaveText("Closed");
   await page.reload();
-  expect(await options(page)).toEqual(["Factory", "Evening hymn"]);
+  expect(await mine(page)).toEqual(["Evening hymn"]);
   await expect(page.locator("#patchSel")).toHaveValue("Factory");
 });
 
@@ -196,6 +201,89 @@ test("old automatic settings that come to the factory sound don't make a patch (
     localStorage.setItem("reed-volume", "90");
   });
   await openOrgan(page, { quiet: false });
-  expect(await options(page)).toEqual(["Factory"]);
+  expect(await options(page)).toEqual(BUILT_IN);
   await expect(page.locator("#volumeOut")).toHaveText("90%");
+});
+
+/* ---------- D34: the built-in voices ---------- */
+const VOICES = { "Lay Still": "lay-still", "Reed Choir": "reed-choir", "Vocal Lead": "vocal-lead" };
+// Downloads what's loaded now and returns its settings.
+async function downloaded(page) {
+  const [d] = await Promise.all([page.waitForEvent("download"), page.click("#patchDownload")]);
+  return JSON.parse(Buffer.concat(await (await d.createReadStream()).toArray()).toString()).settings;
+}
+// Settings compared by content, whatever order their keys are in.
+const sorted = (v) => Array.isArray(v) ? v.map(sorted) : v && typeof v === "object" ? Object.fromEntries(Object.keys(v).sort().map((k) => [k, sorted(v[k])])) : v;
+
+test("the built-in voices come with the organ under Factory, and are protected like it (D34)", async ({ page }) => {
+  await openOrgan(page, { quiet: false });
+  expect(await page.$$eval('#patchSel optgroup[label="Built in"] option', (els) => els.map((e) => e.value))).toEqual(BUILT_IN);
+  await expect(page.locator("#patchSel")).toHaveValue("Factory");   // the organ still opens with Factory
+  for (const name of Object.keys(VOICES)) {
+    await page.selectOption("#patchSel", name);
+    for (const id of ["patchSave", "patchRename", "patchDelete"]) await expect(page.locator("#" + id)).toBeDisabled();
+    await page.waitForTimeout(400);
+    await expect(page.locator("#patchEdited")).toBeHidden();           // every setting applied as saved
+  }
+  await page.click("#patchSaveAs");
+  await page.fill("#patchName", "Reed Choir");
+  await expect(page.locator("#patchOk")).toBeDisabled();               // their names are taken
+  await page.click("#patchCancel");
+});
+
+test("each built-in voice loads exactly as the owner saved it (D34)", async ({ page }) => {
+  await openOrgan(page, { quiet: false });
+  for (const [name, file] of Object.entries(VOICES)) {
+    await page.selectOption("#patchSel", name);
+    const original = JSON.parse(readFileSync(new URL(`./fixtures/${file}.reedorgan.json`, import.meta.url))).settings;
+    expect(sorted(await downloaded(page)), name).toEqual(sorted(original));
+  }
+  // a few things a player sees
+  await page.selectOption("#patchSel", "Lay Still");
+  await expect(page.locator("#directOn")).toBeChecked();
+  await expect(page.locator("#split")).toHaveValue("ef");
+  await expect(page.getByRole("button", { name: "Vox Humana tremolo" })).toHaveAttribute("aria-pressed", "true");
+  await page.selectOption("#patchSel", "Reed Choir");
+  await expect(page.locator("#vibDepthOut")).toHaveText("±14 ¢");
+  expect(await page.locator("#vibMode").inputValue()).toBe("all");
+  await expect(page.getByRole("button", { name: "Sub octave coupler" })).toHaveAttribute("aria-pressed", "true");
+  await page.selectOption("#patchSel", "Vocal Lead");
+  await expect(page.locator("#vibDepthOut")).toHaveText("±22 ¢");
+  await expect(page.locator("#tempoOut")).toHaveText("74 bpm");
+});
+
+test("the organ opens with a built-in voice if that's what you last loaded (D34)", async ({ page }) => {
+  await openOrgan(page, { quiet: false });
+  await page.selectOption("#patchSel", "Vocal Lead");
+  await page.reload();
+  await expect(page.locator("#patchSel")).toHaveValue("Vocal Lead");
+  await expect(page.locator("#vibDepthOut")).toHaveText("±22 ¢");
+  await expect(page.locator("#patchEdited")).toBeHidden();
+});
+
+test("your own copy of a built-in voice: identical is dropped, different is kept under a new name (D34)", async ({ page }) => {
+  const lay = JSON.parse(readFileSync(new URL("./fixtures/lay-still.reedorgan.json", import.meta.url))).settings;
+  await page.addInitScript((lay) => {
+    if (localStorage.getItem("reed-checked")) return;
+    localStorage.setItem("reed-checked", "1");
+    localStorage.setItem("reed-patches", JSON.stringify({
+      "Lay Still": { version: 1, settings: lay },
+      "Vocal Lead": { version: 1, settings: { swell: 40 } },
+      "Hymn": { version: 1, settings: { swell: 20 } },
+    }));
+    localStorage.setItem("reed-patch", JSON.stringify("Vocal Lead"));
+  }, lay);
+  await openOrgan(page, { quiet: false });
+  expect(await mine(page)).toEqual(["Hymn", "Vocal Lead (2)"]);
+  await expect(page.locator("#patchSel")).toHaveValue("Vocal Lead");   // the name you last loaded is now the built-in voice
+  await page.selectOption("#patchSel", "Vocal Lead (2)");
+  await expect(page.locator("#swellOut")).toHaveText("40%");
+});
+
+test("a downloaded built-in voice loads back as a patch of your own (D34)", async ({ page }) => {
+  await openOrgan(page, { quiet: false });
+  const text = readFileSync(new URL("./fixtures/reed-choir.reedorgan.json", import.meta.url));
+  await page.setInputFiles("#patchFile", { name: "reed-choir.reedorgan.json", mimeType: "application/json", buffer: text });
+  await expect(page.locator("#patchSel")).toHaveValue("Reed Choir (2)");
+  await expect(page.locator("#patchSave")).toBeEnabled();
 });
