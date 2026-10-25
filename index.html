@@ -127,6 +127,7 @@
     <details class="vox-panel" id="exprPanel" data-info="expression">
       <summary class="info-host">Expression</summary>
       <div class="vox-body">
+      <p class="expr-label">Scoop</p>
       <div class="vox-grid">
         <div class="field">
           <div class="field-head"><label for="scoopDepthAmt">Scoop</label><output id="scoopDepthOut" for="scoopDepthAmt">Off</output></div>
@@ -143,22 +144,70 @@
             <option value="leaps">Top voice, leaps up</option>
             <option value="all">Every note</option>
             <option value="velocity">Every note, by velocity</option>
+            <option value="accent">Accents, past Crossover</option>
           </select>
+        </div>
+        <div class="field">
+          <div class="field-head"><label for="scoopCrossAmt">Crossover</label><output id="scoopCrossOut" for="scoopCrossAmt">velocity 90</output></div>
+          <input type="range" id="scoopCrossAmt" min="1" max="127" step="1" value="90">
         </div>
         <div class="field">
           <label for="scoopCurve" class="field-label">Curve</label>
           <select id="scoopCurve">
             <option value="ease">Ease in</option>
             <option value="smooth">S-curve</option>
+            <option value="snap">Late snap</option>
           </select>
         </div>
+      </div>
+      <p class="expr-label">Vibrato</p>
+      <div class="vox-grid">
+        <div class="field">
+          <div class="field-head"><label for="vibDepthAmt">Vibrato</label><output id="vibDepthOut" for="vibDepthAmt">Off</output></div>
+          <input type="range" id="vibDepthAmt" min="0" max="100" step="2" value="0">
+        </div>
+        <div class="field">
+          <div class="field-head"><label for="vibRateAmt">Rate</label><output id="vibRateOut" for="vibRateAmt">5.5 Hz</output></div>
+          <input type="range" id="vibRateAmt" min="3" max="8" step="0.1" value="5.5">
+        </div>
+        <div class="field">
+          <div class="field-head"><label for="vibDelayAmt">Delay</label><output id="vibDelayOut" for="vibDelayAmt">400 ms</output></div>
+          <input type="range" id="vibDelayAmt" min="0" max="2500" step="50" value="400">
+        </div>
+        <div class="field">
+          <div class="field-head"><label for="vibFadeAmt">Fade in</label><output id="vibFadeOut" for="vibFadeAmt">500 ms</output></div>
+          <input type="range" id="vibFadeAmt" min="0" max="1500" step="50" value="500">
+        </div>
+        <div class="field">
+          <label for="vibMode" class="field-label">Vibrato on</label>
+          <select id="vibMode">
+            <option value="top">Top voice</option>
+            <option value="all">Every note</option>
+          </select>
+        </div>
+        <div class="field">
+          <div class="field-head"><label for="vibNaturalAmt">Natural variation</label><output id="vibNaturalOut" for="vibNaturalAmt">50%</output></div>
+          <input type="range" id="vibNaturalAmt" min="0" max="100" step="5" value="50">
+        </div>
+        <div class="field">
+          <div class="field-head"><label for="vibColourAmt">Voice colour</label><output id="vibColourOut" for="vibColourAmt">30%</output></div>
+          <input type="range" id="vibColourAmt" min="0" max="100" step="5" value="30">
+        </div>
+        <div class="field">
+          <span class="field-label">Delay control</span>
+          <div class="direct-midi"><span id="vibCC">No controller</span><button class="btn btn-small" id="vibLearn" type="button">Learn</button><button class="btn btn-small" id="vibForget" type="button" hidden>Clear</button></div>
+        </div>
+      </div>
+      <p class="expr-label">Wheels</p>
+      <div class="vox-grid">
         <div class="field">
           <div class="field-head"><label for="bendRangeAmt">Bend range</label><output id="bendRangeOut" for="bendRangeAmt">±2 semitones</output></div>
           <input type="range" id="bendRangeAmt" min="0" max="12" step="1" value="2">
         </div>
       </div>
-      <p class="sub">Playing gestures from singing, horns and blues harmonica rather than from the reed organ itself. Scoop starts a note below its pitch and slides up into it, landing exactly in tune at the end of Scoop time (or when the reed reaches full voice, if that's later). Every reed on the key, and its coupled octaves, bends together. Top voice scoops only the highest note you're holding, so a melody bends over a steady chord; leaps up scoops it only when it jumps up a minor third or more; by velocity scoops harder-struck notes deeper (mouse and computer keys count as fairly hard). Ease in moves fastest at first and settles; S-curve holds low a moment, then rises, for a more obvious bend.</p>
-      <p class="sub">A MIDI keyboard's mod wheel sets Scoop, and its pitch wheel bends every sounding note by up to Bend range.</p>
+      <p class="sub">Playing gestures from singing, horns and blues harmonica rather than from the reed organ itself. Scoop starts a note below its pitch and slides up into it, landing exactly in tune at the end of Scoop time (or when the reed reaches full voice, if that's later). Every reed on the key, and its coupled octaves, bends together. Top voice scoops only the highest note you're holding, so a melody bends over a steady chord; leaps up scoops it only when it jumps up a minor third or more; by velocity scoops harder-struck notes deeper (mouse and computer keys count as fairly hard). Accents scoops only notes struck at or past the Crossover velocity, the full amount or not at all; mouse and computer keys count as 100. Ease in moves fastest at first and settles; S-curve holds low a moment, then rises, for a more obvious bend; Late snap holds below longest and speeds up all the way into the note.</p>
+      <p class="sub">Vibrato waits for the note to settle, then grows in, as a singer's does: short notes never get it, long ones bloom. Delay counts from when the scoop lands; Never leaves it to a controller. Top voice gives the vibrato to the highest note you're holding and moves it to each new top note. Natural variation makes it start a little slow and speed up as it grows, and lets its rate and width wander slightly, as a voice's do. Voice colour brightens the tone as the pitch rises and darkens it as it falls, like a singer's harmonics passing through the resonances of the mouth.</p>
+      <p class="sub">Delay control: press Learn and move any knob, slider or pedal on a MIDI controller. All the way down is Never, all the way up is no delay, so pushing it brings the vibrato in sooner, even on a note you're already holding. A MIDI keyboard's mod wheel sets Scoop (unless you learn it for the delay), and its pitch wheel bends every sounding note by up to Bend range.</p>
       </div>
     </details>
   </section>
@@ -352,6 +401,7 @@
   <div><h3>Deep notes</h3><p>Draw the Bourdon alone and play the bottom of the keyboard. The case rolls off the deepest fundamentals, so the bass sounds reedy, as on a real organ. Set Cabinet bass to Off for a fuller, deeper bass, and choose Full range to play notes below any reed organ from a MIDI keyboard.</p></div>
   <div><h3>Couplers</h3><p>Draw Sub Octave and hold a chord: the keys an octave down sink with yours, and the bass grows heavy. Every coupled note is another set of reeds drinking wind.</p></div>
   <div><h3>Scoop into the tune</h3><p>Open Expression and set Scoop to a semitone. Hold a chord in the left hand and play a melody above it: each melody note slides up into pitch and lands dead in tune, while the chord stays put. Try S-curve for a more obvious bend, Top voice, leaps up so only the jumps scoop, or the mod wheel to ride the depth as you play.</p></div>
+  <div><h3>Let long notes sing</h3><p>Open Expression and set Vibrato to about ±30 ¢. Play a quick run, then hold the last note: the run stays plain and the held note settles, then blooms into vibrato. Add a semitone of Scoop and the vibrato waits for each note to land first. Natural variation keeps it from sounding like a machine; Voice colour makes the tone shimmer with it. Set Delay to Never and Learn a knob or pedal to bring the vibrato in yourself.</p></div>
   <div><h3>Voice your own organ</h3><p>Open Rank voicing under Adjustments. Darken the Diapason, brighten the Principal, or detune a rank a few cents to hear how much a regulator's touch changes the instrument.</p></div>
 </section>
 

@@ -85,9 +85,16 @@ changes the organ's loudness, brightness, pitch and how quickly notes speak.
   up to a whole tone below and slides up into it, landing exactly in tune at
   the end of *Scoop time*; every reed on the key, and its coupled octaves,
   bends together. By default only the top voice scoops, so a melody bends over
-  a steady chord; or only on leaps up, every note, or by MIDI velocity. *Ease
-  in* or *S-curve* shapes. The MIDI pitch wheel bends everything by up to
-  *Bend range*, and the mod wheel sets Scoop.
+  a steady chord; or only on leaps up, every note, by MIDI velocity, or only
+  accents struck past a *Crossover* velocity. *Ease in*, *S-curve* or *Late
+  snap* shapes. **Delayed vibrato** waits for the note to settle and then grows
+  in, as a singer's does, so long notes bloom and quick ones stay plain. It
+  goes to the top voice and moves with the melody; *Natural variation* lets it
+  start slow and wander slightly; *Voice colour* brightens and darkens the tone
+  with the pitch. Its delay can be set by hand or by any MIDI knob or pedal
+  (*Learn*), so pushing a controller up brings vibrato in on a held note. The
+  MIDI pitch wheel bends everything by up to *Bend range*, and the mod wheel
+  sets Scoop.
 - **Rank voicing**: a drawer under Adjustments with level, fine tuning (±20
   cents) and brightness for each rank, plus a button to restore the factory
   voicing. Brightness reshapes the rank's harmonics and is level-matched, so it

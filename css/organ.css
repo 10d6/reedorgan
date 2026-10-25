@@ -113,6 +113,8 @@ select{
 .vox-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px 20px;align-items:start}
 .vox-grid .field{min-width:0}
 .vox-grid select{width:100%}
+.vox-grid input[type=range]:disabled{opacity:.4}
+.expr-label{font-family:var(--f-label);font-style:italic;font-size:13px;color:var(--muted);margin:4px 0 -2px}
 @media (max-width:860px){.vox-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (max-width:480px){.vox-grid{grid-template-columns:1fr}}
 

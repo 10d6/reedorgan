@@ -2,7 +2,7 @@
 // mutate `stops` and `voices` in place.
 
 import { SPLITS } from './core/ranks.js';
-import { SCOOP_MODES, SCOOP_CURVES } from './core/expression.js';
+import { SCOOP_MODES, SCOOP_CURVES, VIB_MODES } from './core/expression.js';
 
 // Settings saved in this browser, under reed-<key>. Never throws.
 export const store = {
@@ -27,6 +27,8 @@ export const S = {
   voxShape: saved('voxShape', 'sine', v => v === 'sine' || v === 'fan'),
   scoopMode: saved('scoopMode', 'top', v => SCOOP_MODES.includes(v)),        // Expression (D28)
   scoopCurve: saved('scoopCurve', 'ease', v => SCOOP_CURVES.includes(v)),
+  vibMode: saved('vibMode', 'top', v => VIB_MODES.includes(v)),               // D29
+  vibCC: saved('vibCC', null, v => v === null || (Number.isInteger(v) && v >= 0 && v < 120)),   // controller for Vibrato delay, none by default
   wheel: [0, 64],      // the MIDI pitch wheel's last position (LSB, MSB); centre is no bend
   reedSeed: store.get('reedSeed', 1),
 };

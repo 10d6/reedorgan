@@ -6,7 +6,7 @@ import { reedError, reedWindResponse, lockReeds } from './core/reeds.js';
 import { windLevel, windBright, windCents, P_REF } from './core/wind.js';
 import { fanWaveCoefficients } from './core/fan.js';
 import { speechTime, onsetTau, BLOOM_LAG, TILT_RATIO } from './core/speech.js';
-import { scoopCurve, scoopValue, scoopDuration, bendCents } from './core/expression.js';
+import { scoopCurve, scoopValue, bendCents, vibStart, vibDelaySec, vibFadeCurve, vibStartRate, wanderCurve, VIB_RATE_WANDER, VIB_DEPTH_WANDER, VIB_COLOUR_DB } from './core/expression.js';
 import { LIMIT, LIMIT_RATIO, limiterMakeupDb, softClipCurve } from './core/output.js';
 import { S, stops, voices, halfOf } from './state.js';
 import { ctl, mix } from './controls.js';
@@ -15,7 +15,7 @@ import { markKey } from './keys.js';
 export let ctx = null;
 let waves, buses = { bass: [], treble: [] }, swell, tiltDb, windGain, trem, lfo, lfoAmp, lfoFilt, windPitch, noiseGain;
 let hiPan, lfoPan, lfoPanAmt, fanLow, shadow, lfoShadow, refl, reflGain, lfoRefl;
-let cabDry, cabWet, roomWet, bassCut, master, pitchBend;
+let cabDry, cabWet, roomWet, bassCut, master, pitchBend, rateWander, depthWander;
 // The knee swell's loudness, closed and fully open, on top of the brighter lid
 // (D21). Before D21 it was 1 → 1.25.
 export const SWELL_CLOSED = .75, SWELL_OPEN = 1.5;
@@ -194,6 +194,13 @@ export function initAudio() {
   windPitch = ctx.createConstantSource(); windPitch.offset.value = 0; windPitch.start();
   // the MIDI pitch wheel, in cents, added to every reed (D28)
   pitchBend = ctx.createConstantSource(); pitchBend.offset.value = bendCents(S.wheel[0], S.wheel[1], ctl.bendRange.value); pitchBend.start();
+  // two slowly wandering values for the vibrato's rate and width (D29), shared
+  // by every voice so coupled octaves wander together
+  const wander = (seconds, step) => {
+    const b = ctx.createBuffer(1, seconds * 3000, 3000); b.copyToChannel(wanderCurve(seconds, 3000, step), 0);
+    const src = ctx.createBufferSource(); src.buffer = b; src.loop = true; src.start(); return src;
+  };
+  rateWander = wander(23, .45); depthWander = wander(29, .6);
   const nb = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate), nd = nb.getChannelData(0);
   for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
   const ns = ctx.createBufferSource(); ns.buffer = nb; ns.loop = true;
@@ -248,6 +255,63 @@ export function applyBend() {
   if (!ctx) return;
   pitchBend.offset.setTargetAtTime(bendCents(S.wheel[0], S.wheel[1], ctl.bendRange.value), ctx.currentTime, .006);
 }
+// Delayed vibrato (D29). Every voice that has one owns a sine LFO, scaled by
+// an envelope (0 until the delay is over, then an S-curve fade to 1), and then
+// by the width in cents into each of its reeds' detune, and by Voice colour in
+// dB into each reed's tone shelf. Coupled octaves start identical LFOs at the
+// same instant with the same automation, so they stay in phase.
+// (Re)schedules a voice's vibrato from the current settings. Once a vibrato has
+// started it keeps going; only its rate, width and colour follow the sliders.
+function scheduleVib(s, now) {
+  if (s.dropped) return;
+  const rate = ctl.vibRate.value, nat = ctl.vibNatural.value, depth = ctl.vibDepth.value;
+  s.depth.gain.setTargetAtTime(depth, now, .03);
+  s.depthWander.gain.setTargetAtTime(depth * VIB_DEPTH_WANDER * nat, now, .03);
+  s.rateWander.gain.setTargetAtTime(rate * VIB_RATE_WANDER * nat, now, .03);
+  s.colour.gain.setTargetAtTime(ctl.vibColour.value * VIB_COLOUR_DB, now, .03);
+  if (s.start <= now) { s.lfo.frequency.setTargetAtTime(rate, now, .1); return; }
+  const start = vibStart(s.land, vibDelaySec(ctl.vibDelay.value), now + .005), fade = Math.max(.02, ctl.vibFade.value);
+  s.env.gain.cancelScheduledValues(now);
+  s.lfo.frequency.cancelScheduledValues(now); s.lfo.frequency.setValueAtTime(vibStartRate(rate, nat), now);
+  s.start = start;
+  if (start === Infinity) return;
+  s.env.gain.setValueCurveAtTime(vibFadeCurve(), start, fade);
+  s.lfo.frequency.setTargetAtTime(rate, start, fade / 2);   // speeds up to its rate as it grows
+}
+function makeVib(v, t, land, oscs, shelves) {
+  const lfo = ctx.createOscillator(), env = ctx.createGain(), depth = ctx.createGain(), colour = ctx.createGain();
+  const rw = ctx.createGain(), dw = ctx.createGain();
+  env.gain.value = 0; depth.gain.value = 0; colour.gain.value = 0; rw.gain.value = 0; dw.gain.value = 0;
+  lfo.connect(env); env.connect(depth); env.connect(colour);
+  oscs.forEach(o => depth.connect(o.detune)); shelves.forEach(sh => colour.connect(sh.gain));
+  rateWander.connect(rw).connect(lfo.frequency); depthWander.connect(dw).connect(depth.gain);
+  lfo.onended = () => {
+    try { rateWander.disconnect(rw); } catch (e) {} try { depthWander.disconnect(dw); } catch (e) {}
+    [lfo, env, depth, colour, rw, dw].forEach(n => n.disconnect());
+  };
+  const s = { lfo, env, depth, colour, rateWander: rw, depthWander: dw, land, start: Infinity, dropped: false };
+  scheduleVib(s, t); lfo.start(t);
+  v.vib = s;
+}
+// The vibrato sliders, and a learned controller moving the delay, update every
+// sounding note's vibrato. A note still waiting for its vibrato gets the new
+// delay, counted from when it landed, so pushing the controller up can bring
+// the vibrato in on a note you're already holding.
+export function applyVibrato() {
+  if (!ctx) return; const now = ctx.currentTime;
+  for (const v of voices.values()) if (v.vib && !v.released) scheduleVib(v.vib, now);
+}
+// When the top voice moves on, the old top note's vibrato fades away, so one
+// voice sings over the accompaniment.
+export function dropVibrato(notes) {
+  if (!ctx) return; const now = ctx.currentTime;
+  for (const n of notes) {
+    const v = voices.get(n); if (!v || !v.vib || v.vib.dropped) continue;
+    const s = v.vib; s.dropped = true;
+    s.env.gain.cancelAndHoldAtTime(now); s.env.gain.setTargetAtTime(0, now, .05);
+  }
+}
+
 // A note that turned out to be part of a chord, not the melody, gives up its
 // scoop: it slides the rest of the way to pitch in 15 ms. It has barely begun to
 // speak by then, so the slide is hardly heard.
@@ -265,8 +329,9 @@ export function unscoop(notes) {
 /* ---------- voices ---------- */
 // Starts a key: one oscillator per rank (stops only change bus gains). Use
 // press()/release() in keys.js for input, which adds coupled octaves.
-// `expr` is the press's Expression (D28): {cents, time, curve} for a scoop from
-// below, shared by every coupled octave of the key so they bend together.
+// `expr` is the press's Expression (D28, D29): {cents, dur, curve} for a scoop
+// from below and `vib` for delayed vibrato, shared by every coupled octave of
+// the key so they move together.
 export function noteOn(m, expr) {
   initAudio(); if (!ctx || m < 21 || m > 108) return;
   S.started = true;
@@ -277,13 +342,14 @@ export function noteOn(m, expr) {
   const speech = ctl.speech.value;
   const amp = .11 * Math.max(.55, 1 - (m - 48) * .006);
   const half = halfOf(m);
-  v = { refs: 1, oscs: [], envs: [], winds: [], released: false, half, f, m, bend: null };
-  const tun = keyTuning(f, m, half);
+  v = { refs: 1, oscs: [], envs: [], winds: [], released: false, half, f, m, bend: null, vib: null };
+  const tun = keyTuning(f, m, half), shelves = [];
   // Scoop (D28): one source per key feeds every reed's detune, so the whole stop
   // combination bends as one voice. It lands exactly on pitch, and never before
-  // the key's 8′ reed has reached full voice.
+  // the played key's 8′ reed has reached full voice (expr.dur, worked out once
+  // for the played key, so coupled octaves land together).
   if (expr && expr.cents > 0) {
-    const dur = scoopDuration(expr.time, speechTime(f, S.pressure, speech));
+    const dur = expr.dur;
     const src = ctx.createConstantSource(); src.offset.value = -expr.cents;
     src.offset.setValueCurveAtTime(scoopCurve(expr.cents, expr.curve), t, dur); src.start(t);
     v.bend = { src, t, dur, depth: expr.cents, curve: expr.curve };
@@ -320,8 +386,10 @@ export function noteOn(m, expr) {
       if (v.bend) { try { v.bend.src.disconnect(o.detune); } catch (e) {} }
       w.disconnect(); sh.disconnect(); g.disconnect(); on.disconnect();
     };
-    v.oscs.push(o); v.envs.push(g); v.winds.push(w);
+    v.oscs.push(o); v.envs.push(g); v.winds.push(w); shelves.push(sh);
   });
+  // Delayed vibrato (D29), counted from when the note lands.
+  if (expr && expr.vib) makeVib(v, t, t + (v.bend ? v.bend.dur : 0), v.oscs, shelves);
   voices.set(m, v); markKey(m, true);
 }
 // Tuning, Celeste beat, Unison pull and stop changes retune notes that are
@@ -358,6 +426,7 @@ function killVoice(v, tc) {
   v.envs.forEach(g => { g.gain.cancelScheduledValues(t); g.gain.setTargetAtTime(0, t, tc); });
   v.oscs.forEach(o => { try { o.stop(t + tc * 10); } catch (e) {} });
   if (v.bend) { try { v.bend.src.stop(t + tc * 10); } catch (e) {} }
+  if (v.vib) { try { v.vib.lfo.stop(t + tc * 10); } catch (e) {} }
 }
 export function noteOff(m) {
   const v = voices.get(m); if (!v || v.released) return;

@@ -4,7 +4,7 @@
 // bloom at zero, so the only pitch movement is the one under test. A scoop is
 // tens of cents; "doesn't scoop" allows a few cents of tracker noise at the onset.
 import { test, expect } from "@playwright/test";
-import { openOrgan, setSlider, toggleStop, pitchTrace, cents } from "./organ.js";
+import { openOrgan, setSlider, toggleStop, pitchTrace, cents, measure } from "./organ.js";
 
 const A3 = 57, C5 = 72;
 const on = (m, v = 100) => [0x90, m, v], off = (m) => [0x80, m, 0];
@@ -164,4 +164,203 @@ test("the mod wheel sets Scoop; Expression settings are remembered (D28)", async
   expect(await page.locator("#scoopCurve").inputValue()).toBe("smooth");
   await expect(page.locator("#scoopDepthOut")).toHaveText("a semitone");
   await expect(page.locator("#scoopTimeOut")).toHaveText("180 ms");
+});
+
+/* ---------- D29: the accent trigger, Late snap and delayed vibrato ---------- */
+// half the peak-to-peak swing in cents over the clear frames between t0 and t1
+const swing = (trace, ref, t0, t1) => { const c = span(trace, ref, t0, t1); return (Math.max(...c) - Math.min(...c)) / 2; };
+// the vibrato's rate in Hz from its upward zero crossings after t0
+function rate(trace, ref, t0) {
+  const xs = clear(trace).filter((f) => f[0] > t0).map((f) => [f[0], cents(f[1], ref)]), ups = [];
+  for (let i = 1; i < xs.length; i++) if (xs[i - 1][1] < 0 && xs[i][1] >= 0) ups.push(xs[i - 1][0] + (xs[i][0] - xs[i - 1][0]) * -xs[i - 1][1] / (xs[i][1] - xs[i - 1][1]));
+  return (ups.length - 1) / (ups[ups.length - 1] - ups[0]);
+}
+async function vibrato(page, settings = {}) {
+  const s = { vibDepthAmt: 40, vibNaturalAmt: 0, vibColourAmt: 0, vibDelayAmt: 400, vibFadeAmt: 300, ...settings };
+  for (const [id, v] of Object.entries(s)) await setSlider(page, id, v);
+}
+
+test("Accents: notes struck past the Crossover scoop fully, softer ones not at all (D29)", async ({ page }) => {
+  await setup(page);
+  await expect(page.locator("#scoopCrossAmt")).toBeDisabled();             // only used by Accents
+  const ref = await reference(page);
+  await setSlider(page, "scoopDepthAmt", 100); await setSlider(page, "scoopTimeAmt", 250);
+  await choose(page, "scoopMode", "accent");
+  await expect(page.locator("#scoopCrossAmt")).toBeEnabled();
+  await expect(page.locator("#scoopCrossOut")).toHaveText("velocity 90");
+  const hard = await play(page, 300, [on(A3, 95)], [A3]);
+  const soft = await play(page, 300, [on(A3, 85)], [A3]);
+  expect(median(span(hard, ref, 0.04, 0.1))).toBeLessThan(-45);           // just past: the full scoop
+  expect(Math.min(...span(soft, ref, 0, 0.3))).toBeGreaterThan(-8);       // just short: none
+  await setSlider(page, "scoopCrossAmt", 80);
+  const now = await play(page, 300, [on(A3, 85)], [A3]);
+  expect(median(span(now, ref, 0.04, 0.1))).toBeLessThan(-45);
+});
+
+test("Late snap holds below longest, then lands exactly (D29)", async ({ page }) => {
+  await setup(page);
+  const ref = await reference(page);
+  await setSlider(page, "scoopDepthAmt", 100); await setSlider(page, "scoopTimeAmt", 250);
+  await choose(page, "scoopCurve", "snap");
+  const tr = await play(page, 600, [on(A3)], [A3]);
+  expect(median(span(tr, ref, 0.12, 0.14))).toBeLessThan(-70);           // halfway: still 7/8 of the way down (ease: 1/4)
+  const landed = span(tr, ref, 0.3, 0.6);
+  expect(Math.max(...landed)).toBeLessThan(0.5);
+  expect(Math.min(...landed)).toBeGreaterThan(-0.5);
+});
+
+test("vibrato is off by default (D29)", async ({ page }) => {
+  await setup(page);
+  await expect(page.locator("#vibDepthOut")).toHaveText("Off");
+  await expect(page.locator("#vibRateOut")).toHaveText("5.5 Hz");
+  await expect(page.locator("#vibDelayOut")).toHaveText("400 ms");
+  await expect(page.locator("#vibCC")).toHaveText("No controller");
+  const ref = await reference(page);
+  const tr = await play(page, 1500, [on(A3)], [A3]);
+  expect(swing(tr, ref, 0.3, 1.5)).toBeLessThan(1);
+});
+
+test("vibrato waits for the delay, grows in, and reaches its width at its rate (D29)", async ({ page }) => {
+  await setup(page);
+  const ref = await reference(page);
+  await vibrato(page);
+  const tr = await play(page, 2200, [on(A3)], [A3]);
+  expect(swing(tr, ref, 0.05, 0.38)).toBeLessThan(1.5);                    // still during the delay
+  expect(swing(tr, ref, 0.42, 0.52)).toBeLessThan(25);                    // just starting to grow
+  expect(swing(tr, ref, 1, 2.2)).toBeGreaterThan(36);                     // full width, ±40 ¢
+  expect(swing(tr, ref, 1, 2.2)).toBeLessThan(44);
+  expect(rate(tr, ref, 1)).toBeGreaterThan(5.2);
+  expect(rate(tr, ref, 1)).toBeLessThan(5.8);
+  expect(Math.abs(median(span(tr, ref, 1, 2.2)))).toBeLessThan(5);        // centred on the note
+});
+
+test("vibrato's delay counts from when the scoop lands (D29)", async ({ page }) => {
+  await setup(page);
+  const ref = await reference(page);
+  await setSlider(page, "scoopDepthAmt", 60); await setSlider(page, "scoopTimeAmt", 300);
+  await vibrato(page, { vibDelayAmt: 300 });
+  const tr = await play(page, 1600, [on(A3)], [A3]);
+  expect(swing(tr, ref, 0.33, 0.58)).toBeLessThan(2);                     // landed, waiting
+  expect(swing(tr, ref, 1, 1.6)).toBeGreaterThan(30);
+});
+
+test("Top voice: the vibrato moves to each new top note; a note under it gets none (D29)", async ({ page }) => {
+  await setup(page);
+  // Divide at middle C with no treble stops, so C5 is a silent key that is still held.
+  await page.selectOption("#split", "bc");
+  await toggleStop(page, "Treble Melodia 8′");
+  const ref = await reference(page);
+  await vibrato(page, { vibDelayAmt: 0, vibFadeAmt: 100 });
+  await midi(page, on(C5)); await page.waitForTimeout(100);
+  const under = await play(page, 1000, [on(A3)], [A3, C5]);
+  expect(swing(under, ref, 0.3, 1)).toBeLessThan(1.5);
+  // A3 alone takes the vibrato; when C5 arrives above it, A3's fades away.
+  const tr = await pitchTrace(page, 1600, [on(A3)]);
+  const handover = await pitchTrace(page, 1000, [on(C5)]);
+  await midi(page, off(A3), off(C5)); await page.waitForTimeout(700);
+  expect(swing(tr, ref, 0.5, 1.6)).toBeGreaterThan(30);
+  expect(swing(handover, ref, 0.4, 1)).toBeLessThan(2);
+  // Every note keeps its own.
+  await choose(page, "vibMode", "all");
+  await midi(page, on(C5)); await page.waitForTimeout(100);
+  const every = await play(page, 1000, [on(A3)], [A3, C5]);
+  expect(swing(every, ref, 0.4, 1)).toBeGreaterThan(30);
+});
+
+test("a learned controller sets the delay: down is Never, pushing it up brings vibrato in on a held note (D29)", async ({ page }) => {
+  await setup(page);
+  const ref = await reference(page);
+  await vibrato(page, { vibFadeAmt: 200 });
+  await page.locator("#exprPanel summary").click();
+  await page.click("#vibLearn");
+  await expect(page.locator("#vibCC")).toHaveText("Move a knob or slider…");
+  await midi(page, [0xb0, 1, 5]);                                         // moving the mod wheel binds it (as Direct wind's Learn, D27)
+  await expect(page.locator("#vibCC")).toHaveText("MIDI CC1 (mod wheel)");
+  await expect(page.locator("#vibDelayOut")).toHaveText("400 ms");
+  await midi(page, [0xb0, 1, 0]);                                         // then all the way down
+  await expect(page.locator("#vibDelayOut")).toHaveText("Never");
+  await expect(page.locator("#scoopDepthOut")).toHaveText("Off");         // the mod wheel no longer sets Scoop
+  const waiting = await pitchTrace(page, 1500, [on(A3)]);
+  expect(swing(waiting, ref, 0.3, 1.5)).toBeLessThan(1.5);
+  const pushed = await pitchTrace(page, 1200, [[0xb0, 1, 127]]);          // all the way up, while holding
+  await midi(page, off(A3)); await page.waitForTimeout(700);
+  await expect(page.locator("#vibDelayOut")).toHaveText("0 ms");
+  expect(swing(pushed, ref, 0.5, 1.2)).toBeGreaterThan(30);
+  // Clear unbinds it, and the mod wheel sets Scoop again.
+  await page.click("#vibForget");
+  await expect(page.locator("#vibCC")).toHaveText("No controller");
+  await midi(page, [0xb0, 1, 64]);
+  await expect(page.locator("#scoopDepthOut")).toHaveText("a semitone");
+  await expect(page.locator("#vibDelayOut")).toHaveText("0 ms");
+});
+
+test("coupled octaves share the vibrato, so the sound stays one clear pitch (D29)", async ({ page }) => {
+  await setup(page);
+  await toggleStop(page, "Super octave coupler");
+  await vibrato(page, { vibDepthAmt: 80, vibDelayAmt: 0, vibFadeAmt: 100, vibNaturalAmt: 100 });
+  const ref = 220;
+  const tr = await play(page, 1500, [on(A3)], [A3]);
+  const during = tr.filter((f) => f[0] > 0.4);
+  expect(swing(tr, ref, 0.4, 1.5)).toBeGreaterThan(55);
+  expect(median(during.map((f) => f[2]))).toBeGreaterThan(0.98);
+  expect(Math.min(...during.map((f) => f[2]))).toBeGreaterThan(0.9);
+});
+
+test("Natural variation makes the vibrato's timing and width wander (D29)", async ({ page }) => {
+  await setup(page);
+  const ref = await reference(page);
+  // spread of the vibrato's cycle lengths, and of its width from one 0.4 s stretch to the next
+  const wander = async () => {
+    const tr = await play(page, 4200, [on(A3)], [A3]);
+    const xs = clear(tr).filter((f) => f[0] > 0.3).map((f) => [f[0], cents(f[1], ref)]), ups = [];
+    for (let i = 1; i < xs.length; i++) if (xs[i - 1][1] < 0 && xs[i][1] >= 0) ups.push(xs[i - 1][0] + (xs[i][0] - xs[i - 1][0]) * -xs[i - 1][1] / (xs[i][1] - xs[i - 1][1]));
+    const per = ups.slice(1).map((u, i) => u - ups[i]), m = per.reduce((a, b) => a + b) / per.length;
+    const widths = []; for (let t = 0.3; t < 4; t += 0.4) widths.push(swing(tr, ref, t, t + 0.4));
+    return { sd: Math.sqrt(per.reduce((a, p) => a + (p - m) ** 2, 0) / per.length), widthRange: Math.max(...widths) - Math.min(...widths) };
+  };
+  await vibrato(page, { vibDelayAmt: 0, vibFadeAmt: 0, vibNaturalAmt: 0 });
+  const machine = await wander();
+  await setSlider(page, "vibNaturalAmt", 100);
+  const natural = await wander();
+  expect(machine.sd).toBeLessThan(0.0045);
+  expect(natural.sd).toBeGreaterThan(machine.sd * 2);
+  expect(machine.widthRange).toBeLessThan(2);
+  expect(natural.widthRange).toBeGreaterThan(5);
+});
+
+test("Voice colour moves the upper harmonics with the vibrato, not the bass (D29)", async ({ page }) => {
+  await openOrgan(page);
+  await page.click("#midiBtn");
+  await toggleStop(page, "Melodia 8′");                                   // Diapason alone: plenty of harmonics
+  await vibrato(page, { vibDepthAmt: 40, vibDelayAmt: 0, vibFadeAmt: 0 });
+  await page.waitForTimeout(1500);
+  const flicker = async () => {
+    await midi(page, on(A3)); await page.waitForTimeout(800);
+    const r = await measure(page, 1500);
+    await midi(page, off(A3)); await page.waitForTimeout(700);
+    return r;
+  };
+  const plain = await flicker();
+  await setSlider(page, "vibColourAmt", 100);
+  const coloured = await flicker();
+  expect(plain.treble).toBeLessThan(3);
+  expect(coloured.treble).toBeGreaterThan(plain.treble + 4);
+  expect(coloured.bass).toBeLessThan(coloured.treble / 3);
+});
+
+test("vibrato and accent settings are remembered (D29)", async ({ page }) => {
+  await setup(page);
+  await page.locator("#exprPanel summary").click();
+  await page.selectOption("#scoopMode", "accent");
+  await page.selectOption("#scoopCurve", "snap");
+  await page.selectOption("#vibMode", "all");
+  for (const [id, v] of [["scoopCrossAmt", 70], ["vibDepthAmt", 30], ["vibRateAmt", 6.2], ["vibFadeAmt", 800], ["vibNaturalAmt", 75], ["vibColourAmt", 10]]) await setSlider(page, id, v);
+  await page.click("#vibLearn");
+  await midi(page, [0xb0, 20, 64]);                                       // binds CC20
+  await midi(page, [0xb0, 20, 64]);                                       // and sets the delay to halfway
+  await page.reload();
+  expect(await page.locator("#scoopMode").inputValue()).toBe("accent");
+  expect(await page.locator("#scoopCurve").inputValue()).toBe("snap");
+  expect(await page.locator("#vibMode").inputValue()).toBe("all");
+  for (const [id, text] of [["scoopCrossOut", "velocity 70"], ["vibDepthOut", "±30 ¢"], ["vibRateOut", "6.2 Hz"], ["vibDelayOut", "1.25 s"], ["vibFadeOut", "800 ms"], ["vibNaturalOut", "75%"], ["vibColourOut", "10%"], ["vibCC", "MIDI CC20"]]) await expect(page.locator("#" + id)).toHaveText(text);
 });
