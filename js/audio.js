@@ -105,7 +105,20 @@ export function applyMix() {
    remains as Whole-sound wobble and Lid wobble. */
 // The Spinning fan shape covers one full turn of a two-bladed fan, so its
 // oscillator runs at half the speed shown (the speed is blade passes per second).
-export const lfoFreq = () => ctl.voxRate() * (S.voxShape === 'fan' ? .5 : 1);
+// The modulation sequencer can drive the fan's speed (D31); fanHz is its speed
+// in blade passes a second while it does, otherwise null and the slider rules.
+let fanHz = null;
+export const lfoFreq = () => (fanHz ?? ctl.voxRate()) * (S.voxShape === 'fan' ? .5 : 1);
+// Called each frame by the control loop: the sequencer's fan speed, or null.
+// While it plays, the fan follows closely; when it stops, the fan eases back to
+// its slider's speed as it does when the slider moves.
+export function setFanSpeed(hz) {
+  if (hz === fanHz) return;
+  fanHz = hz;
+  if (!ctx) return;
+  if (hz === null) { applyVox(); return; }
+  if (stops.vox) [lfo, lfoPan].forEach(o => o.frequency.setTargetAtTime(lfoFreq(), ctx.currentTime, .03));
+}
 export function setFanShape() {
   if (S.voxShape === 'fan') { const { re, im } = fanWaveCoefficients(); lfo.setPeriodicWave(ctx.createPeriodicWave(re, im, { disableNormalization: true })); }
   else lfo.type = 'sine';

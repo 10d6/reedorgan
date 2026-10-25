@@ -9,7 +9,7 @@ import { windLevel, windBright, windCents, windDrain, EASY_REEDS, KNEE, P_REF, g
 import { fanWaveCoefficients } from "../../js/core/fan.js";
 import { METERS, DEFAULT_PATTERN, normalise, reshape, nextCell, cellSeconds, noteAt, pedalsAt, liftGap } from "../../js/core/autoplay.js";
 import { scoopShape, scoopValue, scoopCurve, scoopDuration, scoopDepth, isTop, bendCents, SCOOP_CURVES, LEAP, KEY_VELOCITY, VIB_DELAY_MAX, vibDelaySec, delayFromCC, vibStart, vibFadeCurve, vibStartRate, wanderCurve } from "../../js/core/expression.js";
-import { SEQ_CURVES, SEQ_ROWS, seqShape, DEFAULT_SEQ, normaliseSeq, placeNote, resizeNote, removeNote, setBars, seqValue, seqSteps, stepSeconds, seqPosition } from "../../js/core/modseq.js";
+import { SEQ_TARGETS, SEQ_TARGET_RANGE, toShare, fromShare, amountText, SEQ_CURVES, SEQ_ROWS, seqShape, DEFAULT_SEQ, normaliseSeq, placeNote, resizeNote, removeNote, setBars, seqValue, seqSteps, stepSeconds, seqPosition } from "../../js/core/modseq.js";
 import { volumeGain, bassCutHz, limiterMakeupDb, softClip, softClipCurve } from "../../js/core/output.js";
 
 const near = (a, b, tol, msg) => assert.ok(Math.abs(a - b) <= tol, `${msg ?? ""} expected ${b} ± ${tol}, got ${a}`);
@@ -421,4 +421,20 @@ test("D30: the sequencer runs in 16th notes of the autoplay tempo and loops", ()
   near(seqPosition(.5, 120, 16), 4, 1e-9);
   near(seqPosition(2.25, 120, 16), 2, 1e-9, "one bar at 120 bpm is 2 s");
   near(seqPosition(2.25, 120, 32), 18, 1e-9);
+});
+
+test("D31: the sequencer's targets, their ranges and the Amount readout", () => {
+  assert.deepEqual(SEQ_TARGETS, ["direct", "fan", "swell"]);
+  near(toShare("direct", 1.8), .5, 1e-12);
+  near(toShare("fan", 9), 8 / 11, 1e-12);
+  near(fromShare("fan", 0), 1, 1e-12); near(fromShare("fan", 1), 12, 1e-12);
+  near(toShare("swell", 25), .25, 1e-12);
+  for (const t of SEQ_TARGETS) for (const v of [SEQ_TARGET_RANGE[t][0], SEQ_TARGET_RANGE[t][1], 2.5]) near(fromShare(t, toShare(t, v)), v, 1e-9, t);
+  assert.equal(amountText("direct", 25), "25% · 0.9″");
+  assert.equal(amountText("fan", 25), "25% · 2.8 Hz");
+  assert.equal(amountText("swell", 40), "40% of the swell");
+  assert.equal(amountText("fan", 0), "None");
+  assert.equal(normaliseSeq({ target: "fan" }).target, "fan");
+  assert.equal(normaliseSeq({ target: "swell" }).target, "swell");
+  assert.equal(normaliseSeq({ target: "volume" }).target, "direct");
 });

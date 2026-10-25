@@ -309,21 +309,23 @@ test("coupled octaves share the vibrato, so the sound stays one clear pitch (D29
 test("Natural variation makes the vibrato's timing and width wander (D29)", async ({ page }) => {
   await setup(page);
   const ref = await reference(page);
-  // spread of the vibrato's cycle lengths, and of its width from one 0.4 s stretch to the next
+  // spread of the vibrato's cycle lengths, and of its width from one 0.4 s stretch to the next.
+  // 6.5 s windows: the wander is random, and shorter ones sometimes caught a calm stretch.
   const wander = async () => {
-    const tr = await play(page, 4200, [on(A3)], [A3]);
+    const tr = await play(page, 6500, [on(A3)], [A3]);
     const xs = clear(tr).filter((f) => f[0] > 0.3).map((f) => [f[0], cents(f[1], ref)]), ups = [];
     for (let i = 1; i < xs.length; i++) if (xs[i - 1][1] < 0 && xs[i][1] >= 0) ups.push(xs[i - 1][0] + (xs[i][0] - xs[i - 1][0]) * -xs[i - 1][1] / (xs[i][1] - xs[i - 1][1]));
     const per = ups.slice(1).map((u, i) => u - ups[i]), m = per.reduce((a, b) => a + b) / per.length;
-    const widths = []; for (let t = 0.3; t < 4; t += 0.4) widths.push(swing(tr, ref, t, t + 0.4));
+    const widths = []; for (let t = 0.3; t < 6.3; t += 0.4) widths.push(swing(tr, ref, t, t + 0.4));
     return { sd: Math.sqrt(per.reduce((a, p) => a + (p - m) ** 2, 0) / per.length), widthRange: Math.max(...widths) - Math.min(...widths) };
   };
   await vibrato(page, { vibDelayAmt: 0, vibFadeAmt: 0, vibNaturalAmt: 0 });
   const machine = await wander();
   await setSlider(page, "vibNaturalAmt", 100);
   const natural = await wander();
-  expect(machine.sd).toBeLessThan(0.0045);
-  expect(natural.sd).toBeGreaterThan(machine.sd * 2);
+  // measured over 16 runs: machine 1.1–4.0 ms (the tracker's own noise), natural 6.4–8.7 ms
+  expect(machine.sd).toBeLessThan(0.005);
+  expect(natural.sd).toBeGreaterThan(0.0052);
   expect(machine.widthRange).toBeLessThan(2);
   expect(natural.widthRange).toBeGreaterThan(5);
 });

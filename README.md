@@ -96,13 +96,13 @@ changes the organ's loudness, brightness, pitch and how quickly notes speak.
   MIDI pitch wheel bends everything by up to *Bend range*, and the mod wheel
   sets Scoop.
 - **Modulation sequencer** (off by default): a piano roll that moves Direct
-  wind in time with the tempo. Rows are sweep shapes, up or down along Linear,
+  wind, the Vox Humana fan's speed or the knee swell in time with the tempo. Rows are sweep shapes, up or down along Linear,
   Slow start, Fast start or S-curve; columns are 16th notes over one or two
   bars. Tap to place a shape, drag its ends to stretch it, Backspace to remove
   it. Each note moves the wind by *Amount* from wherever the last one left it,
   stopping at the ends of the gauge. The pattern starts on the first note of a
   phrase (or on each note) and loops while you hold keys. Turning it on turns
-  Direct wind on.
+  on what it moves: Direct wind, or the Vox Humana stop.
 - **Rank voicing**: a drawer under Adjustments with level, fine tuning (±20
   cents) and brightness for each rank, plus a button to restore the factory
   voicing. Brightness reshapes the rank's harmonics and is level-matched, so it

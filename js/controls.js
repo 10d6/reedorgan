@@ -3,7 +3,7 @@
 
 import { RANKS } from './core/ranks.js';
 import { retime } from './autoplay.js';
-import { seqRetime } from './modseq.js';
+import { seqRetime, seqAmountText } from './modseq.js';
 import { HELPER_MAX, GMAX } from './core/wind.js';
 import { volumeGain, bassCutHz } from './core/output.js';
 import { VIB_DELAY_MAX } from './core/expression.js';
@@ -183,7 +183,7 @@ export function setupControls() {
   /* ---- pedal autoplay tempo (D22) ---- */
   ctl.tempo = bindSlider('tempoAmt', 'autoTempo', 100, v => v + ' bpm', () => { retime(); seqRetime(); });   // the sequencer keeps time with it too (D30)
   // the modulation sequencer's Amount (D30): how far each note moves its target, as a share of its range
-  ctl.seqAmount = bindSlider('seqAmountAmt', 'seqAmount', 25, v => v === 0 ? 'None' : v + '% · ' + (v / 100 * GMAX * .9).toFixed(1) + '″', null, v => v / 100);
+  ctl.seqAmount = bindSlider('seqAmountAmt', 'seqAmount', 25, v => seqAmountText(v), null, v => v / 100);
 
   /* ---- helper pump ---- */
   const helperEl = $('helper'), helperOut = $('helperOut');

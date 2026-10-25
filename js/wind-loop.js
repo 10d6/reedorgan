@@ -5,11 +5,11 @@
 import { RANKS, HALVES } from './core/ranks.js';
 import { GMAX, PEAK_FLOW, gaugeInches, windCents, windDrain, stepEnvelope } from './core/wind.js';
 import { S, stops, voices, reduceMotion } from './state.js';
-import { applyWind } from './audio.js';
+import { applyWind, setFanSpeed } from './audio.js';
 import { ctl } from './controls.js';
 import { ped, placeDot } from './treadles.js';
 import { stepAutoplay, autoplayOn } from './autoplay.js';
-import { seqAir, seqPlaying } from './modseq.js';
+import { seqTick, seqPlaying, seqTarget } from './modseq.js';
 
 let needle, rWind, rPitch, rReeds, rUse, statusEl;
 let last = performance.now(), uiT = 0;
@@ -30,8 +30,12 @@ function drawGauge() {
 
 function frame(now) {
   const dt = Math.min(.05, (now - last) / 1000); last = now;
-  // the swell lid swings toward the knee lever rather than jumping
-  S.swellPos += (ctl.swell.value - S.swellPos) * Math.min(1, dt / .12);
+  // the modulation sequencer's target and value this frame, or null (D30, D31)
+  const mod = seqTick(), modOn = t => mod !== null && mod.target === t;
+  setFanSpeed(modOn('fan') ? mod.value : null);
+  // the swell lid swings toward the knee lever rather than jumping; it follows
+  // the sequencer more closely, so its curves keep their shape
+  S.swellPos += ((modOn('swell') ? mod.value / 100 : ctl.swell.value) - S.swellPos) * Math.min(1, dt / (modOn('swell') ? .04 : .12));
   const ranksOn = { bass: 0, treble: 0 };
   HALVES.forEach(h => { ranksOn[h] = RANKS.filter(r => stops[h][r.id]).length; });
   let sounding = 0, reeds = 0;
@@ -47,7 +51,7 @@ function frame(now) {
   const help = ctl.helperRate();
   inflow += help * Math.max(0, Math.min(1, (.8 - S.pressure) / .12));   // helper eases off near full
 
-  const seq = seqAir();                // the modulation sequencer's wind, or null (D30)
+  const seq = modOn('direct') ? mod.value / 3.6 : null;   // the sequencer's wind as a pressure, or null
   if (S.directWind) {
     // Direct wind (D26): the slider sets the reservoir's pressure, and nothing
     // else moves it, except the modulation sequencer while it plays. A short
@@ -84,7 +88,7 @@ function frame(now) {
     }
     let msg = '', ok = false;
     if (!S.started) { msg = 'Press a key to start'; ok = true; }
-    else if (S.directWind) { msg = seqPlaying() ? 'Sequencer moving the wind' : 'Direct wind'; ok = true; }
+    else if (S.directWind) { msg = seqPlaying() && seqTarget() === 'direct' ? 'Sequencer moving the wind' : 'Direct wind'; ok = true; }
     else if (S.reliefT > 0) msg = 'Relief valve venting';
     else if (S.pressure < .05 && sounding) msg = 'Out of wind. Pump!';
     else if (S.pressure < .2) msg = 'Wind is low';
