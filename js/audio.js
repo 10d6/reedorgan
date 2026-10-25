@@ -6,6 +6,7 @@ import { reedError, reedWindResponse, lockReeds } from './core/reeds.js';
 import { windLevel, windBright, windCents, P_REF } from './core/wind.js';
 import { fanWaveCoefficients } from './core/fan.js';
 import { speechTime, onsetTau, BLOOM_LAG, TILT_RATIO } from './core/speech.js';
+import { scoopCurve, scoopValue, scoopDuration, bendCents } from './core/expression.js';
 import { LIMIT, LIMIT_RATIO, limiterMakeupDb, softClipCurve } from './core/output.js';
 import { S, stops, voices, halfOf } from './state.js';
 import { ctl, mix } from './controls.js';
@@ -14,7 +15,7 @@ import { markKey } from './keys.js';
 export let ctx = null;
 let waves, buses = { bass: [], treble: [] }, swell, tiltDb, windGain, trem, lfo, lfoAmp, lfoFilt, windPitch, noiseGain;
 let hiPan, lfoPan, lfoPanAmt, fanLow, shadow, lfoShadow, refl, reflGain, lfoRefl;
-let cabDry, cabWet, roomWet, bassCut, master;
+let cabDry, cabWet, roomWet, bassCut, master, pitchBend;
 // The knee swell's loudness, closed and fully open, on top of the brighter lid
 // (D21). Before D21 it was 1 → 1.25.
 export const SWELL_CLOSED = .75, SWELL_OPEN = 1.5;
@@ -191,6 +192,8 @@ export function initAudio() {
   const ceiling = ctx.createWaveShaper(); ceiling.curve = softClipCurve(); ceiling.oversample = '2x';
   comp.connect(master).connect(limiter).connect(ceiling).connect(ctx.destination);
   windPitch = ctx.createConstantSource(); windPitch.offset.value = 0; windPitch.start();
+  // the MIDI pitch wheel, in cents, added to every reed (D28)
+  pitchBend = ctx.createConstantSource(); pitchBend.offset.value = bendCents(S.wheel[0], S.wheel[1], ctl.bendRange.value); pitchBend.start();
   const nb = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate), nd = nb.getChannelData(0);
   for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
   const ns = ctx.createBufferSource(); ns.buffer = nb; ns.loop = true;
@@ -238,10 +241,33 @@ export function thump(level) {
   o.connect(g).connect(master); o.start(t); o.stop(t + .12);
 }
 
+/* ---------- expression (D28) ---------- */
+// The pitch wheel bends every sounding reed together, by cents.
+// S.wheel is where the wheel was last moved; Bend range sets how far it reaches.
+export function applyBend() {
+  if (!ctx) return;
+  pitchBend.offset.setTargetAtTime(bendCents(S.wheel[0], S.wheel[1], ctl.bendRange.value), ctx.currentTime, .006);
+}
+// A note that turned out to be part of a chord, not the melody, gives up its
+// scoop: it slides the rest of the way to pitch in 15 ms. It has barely begun to
+// speak by then, so the slide is hardly heard.
+export function unscoop(notes) {
+  if (!ctx) return; const t = ctx.currentTime;
+  for (const n of notes) {
+    const v = voices.get(n); if (!v || !v.bend || v.released) continue;
+    const b = v.bend, x = (t - b.t) / b.dur; if (x >= 1) continue;
+    b.src.offset.cancelScheduledValues(b.t);
+    b.src.offset.setValueAtTime(scoopValue(b.depth, b.curve, x), t);
+    b.src.offset.linearRampToValueAtTime(0, t + .015);
+  }
+}
+
 /* ---------- voices ---------- */
 // Starts a key: one oscillator per rank (stops only change bus gains). Use
 // press()/release() in keys.js for input, which adds coupled octaves.
-export function noteOn(m) {
+// `expr` is the press's Expression (D28): {cents, time, curve} for a scoop from
+// below, shared by every coupled octave of the key so they bend together.
+export function noteOn(m, expr) {
   initAudio(); if (!ctx || m < 21 || m > 108) return;
   S.started = true;
   let v = voices.get(m);
@@ -251,8 +277,17 @@ export function noteOn(m) {
   const speech = ctl.speech.value;
   const amp = .11 * Math.max(.55, 1 - (m - 48) * .006);
   const half = halfOf(m);
-  v = { refs: 1, oscs: [], envs: [], winds: [], released: false, half, f, m };
+  v = { refs: 1, oscs: [], envs: [], winds: [], released: false, half, f, m, bend: null };
   const tun = keyTuning(f, m, half);
+  // Scoop (D28): one source per key feeds every reed's detune, so the whole stop
+  // combination bends as one voice. It lands exactly on pitch, and never before
+  // the key's 8′ reed has reached full voice.
+  if (expr && expr.cents > 0) {
+    const dur = scoopDuration(expr.time, speechTime(f, S.pressure, speech));
+    const src = ctx.createConstantSource(); src.offset.value = -expr.cents;
+    src.offset.setValueCurveAtTime(scoopCurve(expr.cents, expr.curve), t, dur); src.start(t);
+    v.bend = { src, t, dur, depth: expr.cents, curve: expr.curve };
+  }
   RANKS.forEach((r, i) => {
     const o = ctx.createOscillator(); o.setPeriodicWave(waves[i]);
     o.frequency.value = f * r.mult;
@@ -261,6 +296,8 @@ export function noteOn(m) {
     o.detune.setValueAtTime(base + ctl.scoop.value, t); o.detune.setTargetAtTime(base, t, .04 * speech);
     const w = ctx.createGain(); w.gain.value = tun.winds[i];   // this reed's own response to the wind
     windPitch.connect(w).connect(o.detune);
+    pitchBend.connect(o.detune);
+    if (v.bend) v.bend.src.connect(o.detune);
     // Speech (D16): the swing grows S-shaped, (1 − e^(−t/τ))², slower for low
     // reeds and low wind. g carries one factor and the release; on the other.
     const fr = f * r.mult, tau = onsetTau(speechTime(fr, S.pressure, speech));
@@ -279,6 +316,8 @@ export function noteOn(m) {
     o.connect(sh).connect(g).connect(on).connect(buses[half][i]); o.start(t + cyc / fr);
     o.onended = () => {
       try { windPitch.disconnect(w); } catch (e) {} try { tiltDb.disconnect(sh.gain); } catch (e) {}
+      try { pitchBend.disconnect(o.detune); } catch (e) {}
+      if (v.bend) { try { v.bend.src.disconnect(o.detune); } catch (e) {} }
       w.disconnect(); sh.disconnect(); g.disconnect(); on.disconnect();
     };
     v.oscs.push(o); v.envs.push(g); v.winds.push(w);
@@ -318,6 +357,7 @@ function killVoice(v, tc) {
   const t = ctx.currentTime; v.released = true;
   v.envs.forEach(g => { g.gain.cancelScheduledValues(t); g.gain.setTargetAtTime(0, t, tc); });
   v.oscs.forEach(o => { try { o.stop(t + tc * 10); } catch (e) {} });
+  if (v.bend) { try { v.bend.src.stop(t + tc * 10); } catch (e) {} }
 }
 export function noteOff(m) {
   const v = voices.get(m); if (!v || v.released) return;

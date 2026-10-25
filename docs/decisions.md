@@ -187,3 +187,32 @@ These come from the owner's own feedback and apply to every change:
 **Chosen:** while Direct wind is on, the MIDI control bound to it (CC7, a keyboard's volume knob, by default) sets the wind, ahead of any other use of that control. While Direct wind is off, CC7 sets the organ's Volume (127 = 100%). A **Learn** button under the Direct wind slider binds whichever control moves next (CC0–119; it connects MIDI first if needed), shown as "MIDI CC<n>" and saved as `reed-directCC`. The breath controller (CC2) still moves Direct wind too.
 **Why:** the owner's MIDI controller has only a volume knob. Most send CC7, but some send another number or nothing over MIDI, so Learn covers those.
 **Note:** a learned control that already does something (CC11 is the knee swell, CC64 the sustain pedal) does Direct wind instead while Direct wind is on.
+
+## D28. Expression: a musical scoop and the pitch wheel (off by default)
+
+**Chosen:** an **Expression** drawer under the Vox Humana fan, closed by default (`reed-exprOpen`), with:
+- **Scoop** (0–200 ¢, default Off; `reed-scoopDepth`): a note starts this far *below* its pitch and slides up into it. **Scoop time** (40–300 ms, default 120 ms) is when it lands; it never lands before the key's 8′ reed reaches full voice (`scoopDuration`), so pitch and tone arrive together.
+- **Scoop on** (`reed-scoopMode`): *Top voice* (default; the highest key held), *Top voice, leaps up* (only when it jumps up a minor third or more), *Every note*, *Every note, by velocity* (MIDI velocity scales the depth; mouse and computer keys count as velocity 100).
+- **Curve** (`reed-scoopCurve`): *Ease in*, (1 − x)², fastest at first then settling; *S-curve*, 1 − smootherstep(x), which holds low a moment and then rises. Both arrive with zero slope.
+- **Bend range** (0–12 semitones, default ±2; `reed-bendRange`) for the MIDI pitch wheel, which bends every sounding reed. The mod wheel (CC1) sets Scoop.
+
+**How:** one `ConstantSource` per key feeds every reed's `detune` (as `windPitch` does), driven by `setValueCurveAtTime` with a curve that ends at exactly 0, so the whole stop combination bends as one voice and lands exactly in tune. `press()` works out the scoop once per played key and gives the same one to every coupled octave. The pitch wheel is one shared `ConstantSource` (`pitchBend`) into every reed. Pure maths in `core/expression.js`.
+
+**Why:** the owner asked for musical tuning gestures beyond realism, starting with a pitch scoop that sounds intentional, as in contemporary music. This is the first deliberately non-historical feature, so it's fenced off in its own drawer and Off by default; the realistic Speech glide (D13, sharp and settling) is untouched and still applies on top. A scoop *from below* is what D13 rejected as a voice or brass gesture; it's also exactly what a blues harmonica player does with a free reed, starting a note bent and releasing up into it. What separates an intended scoop from a sour note:
+- **It lands exactly.** The D13 glide is an exponential (`setTargetAtTime`), which never quite arrives: scaled to a 100 ¢ scoop over 200 ms it would still be 5 ¢ flat at the end. A curve with a defined end arrives and stays.
+- **Everything on the key moves together**, including coupled octaves, so intervals never come apart and nothing beats (the owner's main dislike, D7). Coherent movement isn't detuning.
+- **It's selective.** Scooping every note of a chord sounds like a warped tape; the default scoops only the top voice, so a melody bends over a steady accompaniment.
+- **Chords:** a chord's notes arrive a few milliseconds apart in any order, so a lower note can be the top voice for an instant. When a higher note follows within 35 ms (`CHORD_WINDOW`), the lower one gives up its scoop (slides the rest of the way in 15 ms, while it has barely begun to speak) and doesn't count as the melody's previous note for *leaps up*.
+
+**Measured** (Melodia A3 alone, Reed scatter, Pitch drift, Speech glide and Tone bloom at 0; pitch by autocorrelation of the speaker output):
+- Scoop 100 ¢, 120 ms, at 30 / 50 / 70 / 90 / 110 / 130 ms: Ease in −69.6, −49.2, −30.3, −13.9, −5.1, −0.5 ¢; S-curve −95.3, −87.1, −61.1, −32.0, −9.4, −0.5 ¢. From 150 ms on, both read within ±0.02 ¢ of the unscooped note.
+- Scoop 100 ¢, 120 ms, from 300 to 500 ms: C2 0.00 to +0.10 ¢ (the tracker is noisier this low), A3 −0.01 to 0.00 ¢, C6 −0.03 to +0.02 ¢.
+- Chord window (Scoop 300 ms, A3 sent with a higher key in the same burst): A3 within 0.1 ¢ of pitch by 100 ms; A3 alone is still −35 ¢ then.
+- Pitch wheel at ±2 semitones: fully up +200.00 ¢, fully down −200.00 ¢, centred 0.00 ¢.
+- Off by default: the existing 58 browser tests pass unchanged.
+
+**Side finding (not changed):** with Tone bloom on (D17), the tracker reads every note about +20 ¢ sharp for its first 50 ms, Expression on or off: the bloom shelf opening shifts the fundamental's phase, which is heard as a small sharp onset, in the same direction as D13's glide. The Expression tests turn Tone bloom off so they measure only the scoop.
+
+**Tests:** `tests/expression.spec.js` (9 tests), and four unit tests. Each was confirmed to catch a planted bug: an exponential tail instead of the curve, coupled octaves not scooping with their key, and no chord window. The new file passed 4 out of 4 repeated runs.
+
+**Revisit if:** the owner wants more gestures from the same drawer: harmonica-style breath bends (Direct wind or CC2 bending down by up to a semitone or more), MPE per-note bends, delayed vibrato on the top voice, falls at release, or adaptive just intonation for held chords (a temperament change, so only if asked).

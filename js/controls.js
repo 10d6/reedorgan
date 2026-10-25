@@ -6,7 +6,7 @@ import { retime } from './autoplay.js';
 import { HELPER_MAX, GMAX } from './core/wind.js';
 import { volumeGain, bassCutHz } from './core/output.js';
 import { S, store } from './state.js';
-import { initAudio, applyStops, applyVox, applyMix, applyOutput, setFanShape, retune, rewind, revoice, updateComp, ctx } from './audio.js';
+import { initAudio, applyStops, applyVox, applyMix, applyOutput, applyBend, setFanShape, retune, rewind, revoice, updateComp, ctx } from './audio.js';
 
 // Filled in by setupControls(). Each slider is {el, value, set(v)}; `value` is
 // already mapped to what the sound uses (see bindSlider).
@@ -150,6 +150,18 @@ export function setupControls() {
   ctl.voxStereo = bindSlider('voxStereoAmt', 'voxStereo', 0, v => v === 0 ? 'Off' : v + '%', () => applyVox(), v => v / 100);
   ctl.voxWhole = bindSlider('voxWholeAmt', 'voxWhole', 0, v => v === 0 ? 'Off' : v + '%', () => applyVox(), v => v / 100);
   ctl.voxLid = bindSlider('voxLidAmt', 'voxLid', 0, v => v === 0 ? 'Off' : v + '%', () => applyVox(), v => v * 4);   // 100% = ±400 cents on the lid filter
+
+  /* ---- Expression (D28): a musical scoop and the pitch wheel, off by default ---- */
+  ctl.scoopDepth = bindSlider('scoopDepthAmt', 'scoopDepth', 0, v => v === 0 ? 'Off' : v === 100 ? 'a semitone' : v === 200 ? 'a whole tone' : v + ' ¢');
+  ctl.scoopTime = bindSlider('scoopTimeAmt', 'scoopTime', 120, v => v + ' ms', null, v => v / 1000);
+  ctl.bendRange = bindSlider('bendRangeAmt', 'bendRange', 2, v => v === 0 ? 'Off' : '±' + v + (v === 1 ? ' semitone' : ' semitones'), () => applyBend());
+  [['scoopMode', 'scoopMode'], ['scoopCurve', 'scoopCurve']].forEach(([id, key]) => {
+    const el = $(id); el.value = S[key];
+    el.addEventListener('change', () => { S[key] = el.value; store.set(key, S[key]); });
+  });
+  const exprPanel = $('exprPanel');
+  exprPanel.open = store.get('exprOpen', false);
+  exprPanel.addEventListener('toggle', () => store.set('exprOpen', exprPanel.open));
 
   /* ---- pedal autoplay tempo (D22) ---- */
   ctl.tempo = bindSlider('tempoAmt', 'autoTempo', 100, v => v + ' bpm', () => retime());
