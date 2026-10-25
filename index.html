@@ -210,6 +210,34 @@
       <p class="sub">Delay control: press Learn and move any knob, slider or pedal on a MIDI controller. All the way down is Never, all the way up is no delay, so pushing it brings the vibrato in sooner, even on a note you're already holding. A MIDI keyboard's mod wheel sets Scoop (unless you learn it for the delay), and its pitch wheel bends every sounding note by up to Bend range.</p>
       </div>
     </details>
+    <details class="vox-panel" id="seqPanel" data-info="seq">
+      <summary class="info-host">Modulation sequencer</summary>
+      <div class="vox-body">
+      <div class="seq-head">
+        <label class="check" for="seqOn"><input type="checkbox" id="seqOn"> Play the pattern</label>
+        <div class="field">
+          <label for="seqTarget" class="field-label">Moves</label>
+          <select id="seqTarget"><option value="direct">Direct wind</option></select>
+        </div>
+        <div class="field">
+          <label for="seqTrigger" class="field-label">Starts on</label>
+          <select id="seqTrigger"><option value="first">First note</option><option value="each">Each note</option></select>
+        </div>
+        <div class="field">
+          <label for="seqBars" class="field-label">Length</label>
+          <select id="seqBars"><option value="1">1 bar</option><option value="2">2 bars</option></select>
+        </div>
+        <div class="field seq-amount">
+          <div class="field-head"><label for="seqAmountAmt">Amount</label><output id="seqAmountOut" for="seqAmountAmt">25% · 0.9″</output></div>
+          <input type="range" id="seqAmountAmt" min="0" max="100" step="1" value="25">
+        </div>
+        <button class="btn btn-small" id="seqClear" type="button">Clear pattern</button>
+      </div>
+      <div class="seq-roll"><div class="seq-grid" id="seqGrid" role="group" aria-label="Modulation pattern"></div></div>
+      <p class="sub">A piano roll of sweeps. Each row is a shape, rising or falling; tap a square to put that shape there, and drag either end of a note to stretch it backwards or forwards. Tap a note to select it: Backspace removes it, Shift with the arrow keys stretches it, Alt with the arrow keys shortens it. One shape plays at a time, so a new note replaces any note it lands on.</p>
+      <p class="sub">Each note moves the wind by Amount, starting from wherever the last note left it, and the wind holds still between notes. A sweep that reaches 0″ or 3.6″ stops there. The pattern keeps time in 16th notes with Pedal autoplay's tempo. It starts on the first note of a phrase (or on each note), loops while you hold keys, starts each pass from the Direct wind slider's setting, and lets the wind ease back to that setting when you let go. Turning it on turns Direct wind on.</p>
+      </div>
+    </details>
   </section>
 
   <section class="console" aria-label="Playing" data-info="play">
@@ -402,6 +430,7 @@
   <div><h3>Couplers</h3><p>Draw Sub Octave and hold a chord: the keys an octave down sink with yours, and the bass grows heavy. Every coupled note is another set of reeds drinking wind.</p></div>
   <div><h3>Scoop into the tune</h3><p>Open Expression and set Scoop to a semitone. Hold a chord in the left hand and play a melody above it: each melody note slides up into pitch and lands dead in tune, while the chord stays put. Try S-curve for a more obvious bend, Top voice, leaps up so only the jumps scoop, or the mod wheel to ride the depth as you play.</p></div>
   <div><h3>Let long notes sing</h3><p>Open Expression and set Vibrato to about ±30 ¢. Play a quick run, then hold the last note: the run stays plain and the held note settles, then blooms into vibrato. Add a semitone of Scoop and the vibrato waits for each note to land first. Natural variation keeps it from sounding like a machine; Voice colour makes the tone shimmer with it. Set Delay to Never and Learn a knob or pedal to bring the vibrato in yourself.</p></div>
+  <div><h3>Let the pattern breathe</h3><p>Open Modulation sequencer and tick Play the pattern. Hold a chord: the wind swells up and back every bar, in time with Pedal autoplay's tempo, and the gauge follows it. Tap squares to add sweeps of your own, drag their ends to stretch them, and raise Amount for deeper swells. Set Starts on to Each note for a swell that restarts with every chord.</p></div>
   <div><h3>Voice your own organ</h3><p>Open Rank voicing under Adjustments. Darken the Diapason, brighten the Principal, or detune a rank a few cents to hear how much a regulator's touch changes the instrument.</p></div>
 </section>
 

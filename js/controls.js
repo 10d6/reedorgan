@@ -3,6 +3,7 @@
 
 import { RANKS } from './core/ranks.js';
 import { retime } from './autoplay.js';
+import { seqRetime } from './modseq.js';
 import { HELPER_MAX, GMAX } from './core/wind.js';
 import { volumeGain, bassCutHz } from './core/output.js';
 import { VIB_DELAY_MAX } from './core/expression.js';
@@ -12,6 +13,8 @@ import { initAudio, applyStops, applyVox, applyMix, applyOutput, applyBend, appl
 // Filled in by setupControls(). Each slider is {el, value, set(v)}; `value` is
 // already mapped to what the sound uses (see bindSlider).
 export const ctl = {};
+// Turns Direct wind on or off, as its switch does (the sequencer turns it on, D30).
+export let setDirectWind = () => {};
 // Cabinet, room and treadle-noise levels in percent.
 export const mix = { cab: store.get('cab', 45), room: store.get('room', 30), thump: store.get('thump', 30) };   // treadle noise 30% since D25
 
@@ -53,7 +56,8 @@ export function setupControls() {
   ctl.directAir = bindSlider('airAmt', 'directAir', 20, v => (v / 10).toFixed(1) + '″', null, v => v / 10 / (GMAX * .9));
   const directEl = $('directOn');
   const syncDirect = () => { directEl.checked = S.directWind; ctl.directAir.el.disabled = !S.directWind; };
-  directEl.addEventListener('change', () => { initAudio(); S.directWind = directEl.checked; store.set('directWind', S.directWind); syncDirect(); });
+  setDirectWind = on => { S.directWind = on; store.set('directWind', on); syncDirect(); };
+  directEl.addEventListener('change', () => { initAudio(); setDirectWind(directEl.checked); });
   syncDirect();
   ctl.swell = bindSlider('swellAmt', 'swell', 0, v => v === 0 ? 'Closed' : v === 100 ? 'Full' : v + '%', null, v => v / 100);
   ctl.res = bindSlider('resAmt', 'reservoir', 45, fmtX, null, logMap(.4, 3));
@@ -177,7 +181,9 @@ export function setupControls() {
   exprPanel.addEventListener('toggle', () => store.set('exprOpen', exprPanel.open));
 
   /* ---- pedal autoplay tempo (D22) ---- */
-  ctl.tempo = bindSlider('tempoAmt', 'autoTempo', 100, v => v + ' bpm', () => retime());
+  ctl.tempo = bindSlider('tempoAmt', 'autoTempo', 100, v => v + ' bpm', () => { retime(); seqRetime(); });   // the sequencer keeps time with it too (D30)
+  // the modulation sequencer's Amount (D30): how far each note moves its target, as a share of its range
+  ctl.seqAmount = bindSlider('seqAmountAmt', 'seqAmount', 25, v => v === 0 ? 'None' : v + '% · ' + (v / 100 * GMAX * .9).toFixed(1) + '″', null, v => v / 100);
 
   /* ---- helper pump ---- */
   const helperEl = $('helper'), helperOut = $('helperOut');

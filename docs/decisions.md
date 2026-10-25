@@ -246,3 +246,33 @@ These come from the owner's own feedback and apply to every change:
 **Tests:** 11 new browser tests in `tests/expression.spec.js` and 5 unit tests. Each of these planted bugs was caught: coupled octaves' vibratos out of phase, no handover to a new top voice, a controller unable to reschedule a held note, the delay counted from note-on instead of from the landing, and Late snap falling back to Ease in.
 
 **Revisit if:** the owner wants channel aftertouch to deepen the vibrato (natural on keyboards that have it), a choice of vibrato below the note rather than around it (string-style), vibrato rate that rises slightly towards the end of a long note, or harmonica-style breath bends.
+
+## D30. The modulation sequencer, stage 1: Direct wind
+
+**Chosen:** a **Modulation sequencer** drawer under Expression, off by default (`reed-modseq`, drawer state `reed-seqOpen`). It's a piano roll: the columns are 16th notes over **1 or 2 bars**, and the rows are sweep shapes in two groups, **Sweep up** and **Sweep down**, each with **Linear**, **Slow start** (x²), **Fast start** (1 − (1 − x)²) and **S-curve** (smoothstep).
+- **Editing:** tapping a square puts a one-16th note of that shape there. One shape plays at a time, so a new note replaces any note covering that step, on any row. Dragging either end of a note stretches or shortens it backwards or forwards, without running into its neighbours or past the pattern's ends.
+  - With a note selected: Backspace or Delete removes it, Shift+→ / Shift+← stretch it, and Alt+← / Alt+→ shorten it from the end or the start. These keys are kept from the organ, so they don't pump the treadles; other keys still play notes.
+  - **Clear pattern** empties it. Going from 2 bars to 1 keeps what fits.
+- **Amount** (0–100%, default 25%; `reed-seqAmount`): how far every note moves its target, as a share of the target's whole range. For Direct wind, 25% is 0.9″ of the 3.6″ scale; the readout shows both.
+- **Movement:** each note starts from wherever the last one left the wind, so the movement is continuous; between notes the wind holds still. A sweep that reaches 0″ or 3.6″ stops there, so sweeping up past the top does nothing, and the next sweep down starts from the top.
+- **Timing:** 16th notes of Pedal autoplay's tempo (quarter = the tempo, whatever autoplay's meter). A tempo change keeps the pattern's place.
+- **Starts on: First note** (default): the pattern starts when a key goes down with no other keys held, and loops while keys are held (the sustain pedal counts as holding). **Each note** restarts it on every key.
+- **Each pass starts from the Direct wind slider's setting.** The sequencer moves the sound, not the slider. When you let go of every key, it stops and the wind eases back to the setting. The playhead shows where the pattern is, and the status line reads *Sequencer moving the wind*.
+- **Turning it on turns Direct wind on.** It only moves the wind while Direct wind is on; with Direct wind off, the treadles have the wind as usual. The **Moves** menu has only Direct wind for now.
+- The default pattern is an S-curve up over the first half bar and back down over the second, so it loops smoothly. It does nothing until the sequencer is turned on.
+
+**How:** pure maths in `core/modseq.js` (`seqValue`, `placeNote`, `resizeNote`, `normaliseSeq`), the editor and transport in `js/modseq.js`. The control loop asks `seqAir()` each frame for the pressure it wants. While the sequencer plays, Direct wind's glide is 25 ms instead of 60 ms, so the curves keep their shape. `press()` and `release()` tell the sequencer when a phrase starts and ends.
+
+**Why:** the owner asked for a modulation mini sequencer with these features, staged so the editor can be reviewed before more targets are added. Their choices on the open questions: the pattern loops while keys are held; every pass starts from the control's own setting (so a loop repeats the same shape rather than climbing to a limit); and later there will be one target at a time, chosen from a menu. The curve names describe what you hear (Slow start, Fast start) rather than animation terms, because the Scoop curves (D28) already use "Ease in" to mean easing into the note.
+
+**Note:** because every pass starts from the setting, a pattern that ends somewhere else jumps back at the loop point, softened only by the 25 ms glide. The default pattern ends where it starts.
+
+**Measured** (wind gauge read every frame; Direct wind at 1.0″, 120 bpm, so one bar is 2 s):
+- Default pattern, Amount 25%: 1.00″ at the start, 1.44″ at 0.5 s, 1.90″ at 1.0 s, 1.46″ at 1.5 s, 1.00″ at 2.0 s, and the same on every later bar. After the key is let go, the gauge is back within 0.03″ of 1.0″ in 0.5 s.
+- From 3.0″, a Linear sweep up of 0.9″ over four 16ths stops at 3.6″ and holds there through the gap; the following sweep down ends at 2.7″, 0.9″ below the top.
+- A whole-bar Linear sweep up with a second key pressed 1.1 s in: with First note it carries on (about 2.35″ at 1.5 s); with Each note it starts again (about 1.36″ at 1.5 s).
+- Off by default: all browser tests from before pass unchanged.
+
+**Tests:** `tests/modseq.spec.js` (8 tests) and 7 unit tests. Each of these planted bugs was caught: no limit between notes, notes not building on each other, Each note ignored, not stopping on release, editing keys pumping the treadles, and turning it on without turning Direct wind on.
+
+**Next (stage 2):** Vox Humana fan speed and Knee swell in the Moves menu. Choosing the fan will draw the Vox Humana stop if it's in, as choosing Direct wind turns Direct wind on.

@@ -7,7 +7,7 @@ exists. For *why* things are built this way, see [decisions.md](decisions.md).
 
 | Path | What it is |
 | --- | --- |
-| `index.html` | The markup: cabinet with a top bar (name, gauge, Volume/MIDI/All notes off), stop rail with the Rank voicing, Vox Humana fan and Expression drawers, the wind status line under the gauge, Knee swell, keyboard, treadle area, Adjustments, notes. Loads `css/organ.css` and `js/main.js`. |
+| `index.html` | The markup: cabinet with a top bar (name, gauge, Volume/MIDI/All notes off), stop rail with the Rank voicing, Vox Humana fan, Expression and Modulation sequencer drawers, the wind status line under the gauge, Knee swell, keyboard, treadle area, Adjustments, notes. Loads `css/organ.css` and `js/main.js`. |
 | `css/organ.css` | All styles. Colour tokens are in the `:root` block at the top. |
 | `js/main.js` | Entry point: calls each module's setup in order (see below). |
 | `js/state.js` | Shared state: `S` (pressure, swell, tone and the saved choices), `stops`, `voices`, `store` (localStorage), `halfOf`. |
@@ -18,8 +18,9 @@ exists. For *why* things are built this way, see [decisions.md](decisions.md).
 | `js/treadles.js` | The two treadles: ADSR state (`ped`), pedals, envelope pictures, `gateOn`/`gateOff`. |
 | `js/info.js` | The info buttons: `setupInfo()` adds an "i" button to every `[data-info]` section's `.info-host` heading, which shows or hides that section's own `.sub` and `.hint` text (D24). |
 | `js/autoplay.js` | Pedal autoplay: the pattern editor, its saved pattern, and `stepAutoplay()`, which the control loop calls each frame to press and lift the treadles through `gateOn`/`gateOff`. |
+| `js/modseq.js` | The modulation sequencer (D30): the piano-roll editor, its saved pattern, `seqPress`/`seqReleaseAll` (called from `press`/`release`), and `seqAir()`, which the control loop calls each frame for the Direct wind pressure it wants. |
 | `js/wind-loop.js` | The per-frame control loop (`frame`), the gauge and readouts. |
-| `js/core/*.js` | Pure maths, with no page or audio access: `ranks.js` (ranks, harmonic recipes, brightness compensation, Celeste), `reeds.js` (per-reed scatter, wind response and Unison pull), `wind.js` (loudness, brightness and pitch against pressure, treadle envelopes), `speech.js` (how a reed speaks: onset time and shape, tone bloom, the tone shelf's position), `fan.js` (the spinning-fan wave), `expression.js` (the scoop curves and which notes scoop, the vibrato's delay, fade-in, natural variation and wander curve, the delay controller's mapping, the pitch wheel's range), `output.js` (volume, cabinet bass corner, limiter make-up, soft clip), `autoplay.js` (meters, pattern editing and reshaping, which treadle is down at a given time). |
+| `js/core/*.js` | Pure maths, with no page or audio access: `ranks.js` (ranks, harmonic recipes, brightness compensation, Celeste), `reeds.js` (per-reed scatter, wind response and Unison pull), `wind.js` (loudness, brightness and pitch against pressure, treadle envelopes), `speech.js` (how a reed speaks: onset time and shape, tone bloom, the tone shelf's position), `fan.js` (the spinning-fan wave), `expression.js` (the scoop curves and which notes scoop, the vibrato's delay, fade-in, natural variation and wander curve, the delay controller's mapping, the pitch wheel's range), `output.js` (volume, cabinet bass corner, limiter make-up, soft clip), `autoplay.js` (meters, pattern editing and reshaping, which treadle is down at a given time), `modseq.js` (the sequencer's curves, rows, pattern editing and the wind's value at any point in a pass). |
 | `tests/*.spec.js` | Playwright tests that play the organ and measure its sound. See `tests/README.md`. |
 | `tests/unit/` | Unit tests for `js/core` (`npm run test:unit`, no browser). |
 | `scripts/check.mjs` | Static checks: page shape, referenced files, module syntax, imports resolve to real exports, element ids, allowed external hosts. |
@@ -59,8 +60,9 @@ define constants and functions. All work happens in the setup functions, which
 3. `setupKeys()`: builds the keyboard and attaches pointer, computer-key and MIDI input.
 4. `setupTreadles()`: builds the pedals and envelope controls.
 5. `setupAutoplay()`: builds the pedal autoplay editor from the saved pattern.
-6. `setupInfo()`: adds the info buttons and hides the explanations each section has hidden.
-7. `startWindLoop()`: draws the gauge and starts `frame()`.
+6. `setupModSeq()`: builds the modulation sequencer's piano roll from the saved pattern.
+7. `setupInfo()`: adds the info buttons and hides the explanations each section has hidden.
+8. `startWindLoop()`: draws the gauge and starts `frame()`.
 
 Keep it that way. If a module needs something at load time, it may only use
 `js/core` and `state.js`, which don't import anything else. The audio graph is
@@ -106,7 +108,7 @@ Modulators (all audio-rate `AudioParam` connections):
 physics is simulated:
 
 1. Pedal autoplay (`stepAutoplay`): works out which treadle the pattern holds down now (`pedalsAt`) and calls `gateOn`/`gateOff` on changes. It does nothing until the audio context exists (the player's first touch). Then step both treadle ADSR envelopes (`stepEnvelope`).
-2. Reservoir: with Direct wind on (D26), pressure glides to the slider's value and nothing else moves it. Otherwise `pressure += (inflow − drain) · dt / reservoirSize`. Inflow comes from the treadles (alternating feet fill better) and the helper pump. Drain (`windDrain`) grows with sounding reeds and the knee swell; with Easy wind it counts at most three reeds (D23). Pressure is clamped to 0–1, and the relief valve vents at 1.
+2. Reservoir: with Direct wind on (D26), pressure glides to the slider's value and nothing else moves it, except the modulation sequencer: while it plays, pressure follows `seqAir()` with a 25 ms glide (D30). Otherwise `pressure += (inflow − drain) · dt / reservoirSize`. Inflow comes from the treadles (alternating feet fill better) and the helper pump. Drain (`windDrain`) grows with sounding reeds and the knee swell; with Easy wind it counts at most three reeds (D23). Pressure is clamped to 0–1, and the relief valve vents at 1.
 3. Smooth the knee swell (`swellPos`) and the tone pressure (`tonePress`, Response time).
 4. `applyWind()` pushes targets into the audio graph: wind gain (`windLevel`, with a knee at 2″), lid filter and `tiltDb` (depending on the tone model; each reed's own shelf applies the tilt, D17), `windPitch` offset (`windCents`: flat as the wind rises, D12), breath noise level.
 5. Update the gauge, treadle visuals and readouts (readouts at 10 Hz).
@@ -160,6 +162,7 @@ held keys when a coupler is drawn or retired.
 | Case and room | `audio.js` | `cabinetIR`, `impulse`, `applyMix`, `mix` |
 | Direct wind | `wind-loop.js`, `controls.js`, `autoplay.js`, `keys.js`, `state.js` | `S.directWind`, `ctl.directAir`, `#directOn`, `#airAmt`, MIDI CC2 and `S.directCC` (CC7 by default; `#directLearn`, `setDirectCC`) |
 | Easy wind | `core/wind.js`, `wind-loop.js`, `treadles.js`, `state.js` | `windDrain`, `EASY_REEDS`, `S.easyWind`, `#easyWind` |
+| Modulation sequencer | `modseq.js`, `core/modseq.js`, `keys.js`, `wind-loop.js`, `controls.js` | `seqValue`, `placeNote`, `resizeNote`, `removeNote`, `setBars`, `normaliseSeq`, `SEQ_ROWS`, `SEQ_CURVES`, `seqPress`, `seqReleaseAll`, `seqAir`, `seqPlaying`, `seqRetime`, `setDirectWind`, `ctl.seqAmount`, store key `modseq`, `#seqPanel`, `#seqGrid` |
 | Pedal autoplay | `autoplay.js`, `core/autoplay.js`, `controls.js`, `wind-loop.js` | `stepAutoplay`, `setupAutoplay`, `retime`, `pedalsAt`, `noteAt`, `reshape`, `METERS`, `ctl.tempo`, store key `autoplay` |
 | MIDI | `keys.js` | `connectMidi`, `onMidi` (notes with velocity, pitch wheel, CC1 Scoop, a learned CC for Vibrato delay, CC64 sustain, CC11/CC4 swell, CC7 volume or Direct wind, CC2 Direct wind, CC120/123); MIDI Learn for Direct wind and Vibrato delay (`LEARN`, `setLearned`, `showCC`) |
 | Expression (scoop, vibrato, pitch wheel) | `core/expression.js`, `keys.js`, `audio.js`, `controls.js`, `state.js` | `scoopCurve`, `scoopDepth`, `scoopDuration`, `bendCents`, `CHORD_WINDOW`, `KEY_VELOCITY`, `vibStart`, `vibFadeCurve`, `vibStartRate`, `wanderCurve`, `delayFromCC`, `expressionFor`, `press(m, velocity)`, `noteOn(m, expr)`, `unscoop`, `makeVib`, `scheduleVib`, `applyVibrato`, `dropVibrato`, `applyBend`, `pitchBend`, `rateWander`, `depthWander`, `ctl.scoopDepth`, `ctl.scoopTime`, `ctl.scoopCross`, `ctl.vibDepth`, `ctl.vibRate`, `ctl.vibDelay`, `ctl.vibFade`, `ctl.vibNatural`, `ctl.vibColour`, `ctl.bendRange`, `#exprPanel`, `#vibLearn` |

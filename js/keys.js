@@ -3,6 +3,7 @@
 
 import { S, stops, voices, splitNote, store } from './state.js';
 import { initAudio, noteOn, noteOff, silenceAll, unscoop, dropVibrato, applyBend, ctx } from './audio.js';
+import { seqPress, seqReleaseAll } from './modseq.js';
 import { scoopDepth, scoopDuration, isTop, delayFromCC, CHORD_WINDOW, KEY_VELOCITY } from './core/expression.js';
 import { speechTime } from './core/speech.js';
 import { noteFreq } from './core/ranks.js';
@@ -90,6 +91,7 @@ function expressionFor(m, velocity) {
 }
 // Every coupled octave of a key gets the same Expression, so they move together.
 export function press(m, velocity = KEY_VELOCITY) {
+  seqPress(coupled.size === 0);   // the modulation sequencer starts on the first note of a phrase (D30)
   const set = couplesFor(m), ex = expressionFor(m, velocity);
   if (ex.top && S.vibMode === 'top' && vibSet) { dropVibrato(vibSet); vibSet = null; }
   set.forEach(n => noteOn(n, ex));
@@ -101,6 +103,7 @@ export function release(m) {
   const st = coupled.get(m); if (!st || !st.length) return;
   st.shift().forEach(noteOff);
   if (!st.length) coupled.delete(m);
+  if (!coupled.size) seqReleaseAll();
 }
 // Drawing or retiring a coupler moves the keys under a chord that is already held.
 export function recouple() {
@@ -144,6 +147,7 @@ function showCC() {
 export function allNotesOff() {
   kbHeld.clear(); ptrs.clear(); midiHeld.clear(); sustained.clear(); coupled.clear();
   topKey = topBefore = topSet = vibSet = null; topAt = -Infinity;
+  seqReleaseAll();
   silenceAll();
 }
 function setMidi(msg, cls) { midiStatus.textContent = msg; midiStatus.className = 'midi-status' + (cls ? ' ' + cls : ''); }
