@@ -10,6 +10,8 @@ import { fanWaveCoefficients } from "../../js/core/fan.js";
 import { scoopShape, scoopValue, scoopCurve, scoopDuration, scoopDepth, isTop, bendCents, SCOOP_CURVES, LEAP, KEY_VELOCITY, VIB_DELAY_MAX, vibDelaySec, delayFromCC, vibStart, vibFadeCurve, vibStartRate, wanderCurve } from "../../js/core/expression.js";
 import { SEQ_TARGETS, SEQ_TARGET_RANGE, toShare, fromShare, amountText, SEQ_CURVES, SEQ_ROWS, seqShape, DEFAULT_SEQ, normaliseSeq, placeNote, resizeNote, removeNote, seqValue, seqSteps, stepSeconds, seqPosition, METERS, stepsPerBar, stepsPerBeat, stroke, reshape, migrateSaved, FREE_LANES } from "../../js/core/modseq.js";
 import { PATCH_VERSION, FACTORY, NAME_MAX, cleanName, uniqueName, sortNames, sameSettings, normaliseLibrary, patchFile, fileName, readPatchFile } from "../../js/core/patches.js";
+import { BUILT_IN } from "../../js/core/presets.js";
+import { readFileSync } from "node:fs";
 import { volumeGain, bassCutHz, limiterMakeupDb, softClip, softClipCurve } from "../../js/core/output.js";
 
 const near = (a, b, tol, msg) => assert.ok(Math.abs(a - b) <= tol, `${msg ?? ""} expected ${b} ± ${tol}, got ${a}`);
@@ -484,4 +486,16 @@ test("D33: patches go to files and come back; other files are refused with a rea
   assert.throws(() => readPatchFile(JSON.stringify({ ...f, settings: [] })), /isn’t a reed organ patch/);
   assert.throws(() => readPatchFile(JSON.stringify({ ...f, version: PATCH_VERSION + 1 })), /newer version/);
   assert.equal(FACTORY, "Factory");
+});
+
+test("D34: the built-in voices are the owner's patch files, unchanged", () => {
+  const files = { "Lay Still": "lay-still", "Reed Choir": "reed-choir", "Vocal Lead": "vocal-lead" };
+  assert.deepEqual(Object.keys(BUILT_IN), Object.keys(files));
+  for (const [name, file] of Object.entries(files)) {
+    const text = readFileSync(new URL(`../fixtures/${file}.reedorgan.json`, import.meta.url), "utf8");
+    const p = readPatchFile(text);
+    assert.equal(p.name, name);
+    assert.ok(sameSettings(BUILT_IN[name], p.settings), name);
+    assert.notEqual(uniqueName(name, [...Object.keys(BUILT_IN), FACTORY]), name, "their names are taken");
+  }
 });

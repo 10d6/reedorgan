@@ -402,3 +402,33 @@ The Amount readout shows the chosen target's units: "25% · 0.9″", "25% · 2.8
 - the lane on show counting as an edit
 
 **Revisit if:** the owner wants ready-made patches shipped alongside Factory, a "Download all" backup, a warning before leaving with unsaved changes, or a patch to switch on a MIDI program change.
+
+## D34. Built-in voices: Lay Still, Reed Choir and Vocal Lead
+
+**Chosen:** three patches the owner made come with the organ, listed with Factory under **Built in** in the patch menu (your own patches follow under **Your patches**). They're the owner's downloaded patch files, unchanged: the settings are in `js/core/presets.js`, and the files themselves are kept in `tests/fixtures/`, where the tests check the two match.
+- **Lay Still:** Bourdon and Melodia in the bass, Melodia in the treble (stops divided at E | F), Super Octave and Vox Humana. Direct wind at 1.0″, breathing up and down by 20% each bar (69 bpm), long speech, deep bloom, a big cabinet and room.
+- **Reed Choir:** the same, with Diapason in the treble, Sub and Super Octave, no Vox Humana. Delayed vibrato on every note (±14 ¢, after 1.4 s, Natural variation 95%, Voice colour 75%), and a gentler breath on Direct wind (9%) at 74 bpm.
+- **Vocal Lead:** Lay Still's stops without the Vox Humana. Vibrato on the top voice (±22 ¢), and a slight swell on Direct wind (5%) at 74 bpm.
+
+**How they behave:**
+- **Read-only, like Factory:** Save, Rename and Delete are greyed out, Save as… keeps a change, and their names can't be used for your own patches.
+- **Startup:** the organ still opens with Factory, or with whatever you last loaded or saved, built-in voices included.
+- **Duplicates in your library:** a patch of your own with a built-in voice's name (as the owner will have, having made them) is dropped if it's identical, since it's now built in. If it differs, it's kept as "Name (2)".
+- **Files:** a downloaded built-in voice loads back from its file as a patch of your own ("Reed Choir (2)").
+
+**Why:** the owner asked for these voices to come with the organ.
+
+**Measured** (C-major chord C4–E4–G4 held 3 s, default Volume; level against Factory; then a held A4 for the vibrato):
+
+| Voice | Level vs Factory | Peak | Wind | Vibrato on A4 |
+| --- | --- | --- | --- | --- |
+| Factory | 0 dB | −9.9 dBFS | 2.7″ | none |
+| Lay Still | −11.2 dB | −17.6 dBFS | 1.7″ | ±2.5 ¢ (the breathing wind) |
+| Reed Choir | −7.7 dB | −17.5 dBFS | 1.2″ | not measurable (its octave couplers confuse the pitch tracker); set to ±14 ¢ on every note after 1.4 s |
+| Vocal Lead | −13.3 dB | −23.6 dBFS | 1.1″ | ±22.9 ¢ (set ±22 ¢) |
+
+They're quieter than Factory because their Direct wind sits around 1″ rather than 2″. That's part of their soft character, so they're shipped as made. Nothing comes near clipping. Each one loads with no *edited* mark, so every setting in them is used as saved.
+
+**Tests:** 5 browser tests and 1 unit test. Each of these planted bugs was caught: built-in voices overwritable, a differing copy of your own lost, the organ unable to open with a built-in voice, and a loaded file taking a built-in voice's name. The D33 tests now expect the built-in voices in the menu.
+
+**To add a voice:** make it in the organ, Download it, add its name and settings to `BUILT_IN` in `js/core/presets.js` and its file to `tests/fixtures/`, and add it to the lists in the D34 tests.
