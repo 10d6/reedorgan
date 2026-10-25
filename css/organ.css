@@ -286,3 +286,33 @@ kbd{font-family:var(--f-body);font-size:13px;border:1px solid var(--brass-dim);b
 @media (prefers-reduced-motion:reduce){
   .stop,.white,.black,:is(.voicing,.vox-panel) summary::before{transition:none}
 }
+
+/* Modulation sequencer (D30): a piano roll of sweep shapes */
+.seq-head{display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px 20px}
+.seq-head .field{min-width:120px}
+.seq-head .seq-amount{flex:1 1 200px}
+.seq-head .check{color:var(--text);font-family:var(--f-label);font-size:15px;align-self:center}
+.seq-roll{overflow-x:auto;padding-bottom:4px}
+.seq-grid{--label:104px;display:grid;grid-template-columns:var(--label) repeat(var(--steps),minmax(18px,1fr));grid-template-rows:18px repeat(10,26px);position:relative;min-width:0;user-select:none;-webkit-user-select:none}
+.seq-beat{grid-row:1;font-size:11px;color:var(--muted);padding-left:3px;border-left:1px solid rgba(201,160,82,.18)}
+.seq-beat.is-bar{border-left-color:rgba(201,160,82,.5);color:var(--text)}
+.seq-group{grid-column:1 / -1;font-family:var(--f-label);font-style:italic;font-size:13px;color:var(--muted);align-self:end;padding-bottom:2px}
+.seq-label{grid-column:1;display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text);padding-right:6px;white-space:nowrap}
+.seq-icon{width:18px;height:14px;flex:none;fill:none;stroke:var(--brass);stroke-width:1.6}
+.seq-cell{appearance:none;margin:0;padding:0;border:0;border-left:1px solid rgba(201,160,82,.08);border-bottom:1px solid rgba(201,160,82,.08);background:rgba(0,0,0,.18);cursor:pointer}
+.seq-cell.is-beat{border-left-color:rgba(201,160,82,.22)}
+.seq-cell.is-bar{border-left-color:rgba(201,160,82,.55)}
+.seq-cell:hover{background:rgba(201,160,82,.14)}
+.seq-note{appearance:none;position:relative;margin:2px 1px;padding:0;border:1px solid #1a0c06;border-radius:4px;cursor:pointer;z-index:1;min-width:0;overflow:visible;
+  background:linear-gradient(180deg,var(--carpet-hi),var(--carpet))}
+.seq-note.down{background:linear-gradient(180deg,#5a4a2a,#3e3018)}
+.seq-note.selected{box-shadow:0 0 0 2px var(--brass),0 0 10px rgba(201,160,82,.45)}
+.seq-shape{position:absolute;inset:3px 6px;width:calc(100% - 12px);height:calc(100% - 6px);fill:none;stroke:#f3dcc0;stroke-width:1.6;pointer-events:none}
+.seq-handle{position:absolute;top:0;bottom:0;width:8px;cursor:ew-resize;touch-action:none}
+.seq-handle.start{left:-3px}
+.seq-handle.end{right:-3px}
+.seq-note.selected .seq-handle{background:linear-gradient(90deg,transparent 3px,rgba(201,160,82,.9) 3px,rgba(201,160,82,.9) 5px,transparent 5px)}
+.seq-lane{position:relative;pointer-events:none;z-index:2}
+.seq-play{position:absolute;top:0;bottom:0;width:2px;margin-left:-1px;background:var(--brass);box-shadow:0 0 8px rgba(201,160,82,.7)}
+@media (max-width:560px){.seq-grid{--label:28px}.seq-label span{display:none}}
+@media (prefers-reduced-motion:reduce){.seq-play{box-shadow:none}}

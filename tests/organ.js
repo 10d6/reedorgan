@@ -86,6 +86,18 @@ function instrument() {
     const iv = setInterval(() => { const p = window.__pitch(lo, hi); if (p) out.push([e.ctx.currentTime - t0, p[0], p[1]]); }, 6);
     setTimeout(() => { clearInterval(iv); done(out); }, ms);
   });
+  // 5. The wind gauge: plays MIDI messages, then reads the needle every frame for
+  //    `ms`: [[seconds, inches], …]. The needle turns 162° across the 3.6″ scale.
+  window.__gaugeTrace = (ms, msgs = []) => new Promise((done) => {
+    const needle = document.getElementById("needle"), out = [], t0 = performance.now();
+    msgs.forEach(([a, b, c]) => window.__midi(a, b, c));
+    const f = () => {
+      const m = /rotate\(([-\d.]+)/.exec(needle.getAttribute("transform") || "");
+      if (m) out.push([(performance.now() - t0) / 1000, (+m[1] + 90) / 162 * 3.6]);
+      if (performance.now() - t0 < ms) requestAnimationFrame(f); else done(out);
+    };
+    requestAnimationFrame(f);
+  });
   window.__centroid = () => {
     const e = window.__ears; const f = new Float32Array(e.L.frequencyBinCount); e.L.getFloatFrequencyData(f);
     const bin = e.ctx.sampleRate / e.L.fftSize; let n = 0, d = 0;
@@ -144,6 +156,9 @@ export const cents = (hz, ref) => 1200 * Math.log2(hz / ref);
 /** Plays MIDI messages and traces the pitch for `ms`: [[s, hz, clarity], …]. */
 export const pitchTrace = (page, ms, msgs = [], lo = 80, hi = 1000) =>
   page.evaluate(([t, m, l, h]) => window.__pitchTrace(t, m, l, h), [ms, msgs, lo, hi]);
+
+/** Plays MIDI messages and traces the wind gauge for `ms`: [[s, inches], …]. */
+export const gaugeTrace = (page, ms, msgs = []) => page.evaluate(([t, m]) => window.__gaugeTrace(t, m), [ms, msgs]);
 
 export const readout = (page, id) => page.locator("#" + id).textContent();
 export const rms = (page) => page.evaluate(() => window.__rms());

@@ -9,6 +9,7 @@ import { windLevel, windBright, windCents, windDrain, EASY_REEDS, KNEE, P_REF, g
 import { fanWaveCoefficients } from "../../js/core/fan.js";
 import { METERS, DEFAULT_PATTERN, normalise, reshape, nextCell, cellSeconds, noteAt, pedalsAt, liftGap } from "../../js/core/autoplay.js";
 import { scoopShape, scoopValue, scoopCurve, scoopDuration, scoopDepth, isTop, bendCents, SCOOP_CURVES, LEAP, KEY_VELOCITY, VIB_DELAY_MAX, vibDelaySec, delayFromCC, vibStart, vibFadeCurve, vibStartRate, wanderCurve } from "../../js/core/expression.js";
+import { SEQ_CURVES, SEQ_ROWS, seqShape, DEFAULT_SEQ, normaliseSeq, placeNote, resizeNote, removeNote, setBars, seqValue, seqSteps, stepSeconds, seqPosition } from "../../js/core/modseq.js";
 import { volumeGain, bassCutHz, limiterMakeupDb, softClip, softClipCurve } from "../../js/core/output.js";
 
 const near = (a, b, tol, msg) => assert.ok(Math.abs(a - b) <= tol, `${msg ?? ""} expected ${b} ± ${tol}, got ${a}`);
@@ -344,4 +345,80 @@ test("D29: the wander curve is smooth, stays within ±1 and loops", () => {
   assert.ok(jump < .005, `largest step ${jump}`);
   assert.ok(Math.abs(w[w.length - 1] - w[0]) < .005, "the end meets the start");
   assert.ok(Math.max(...w) - Math.min(...w) > 1, "it really wanders");
+});
+
+test("D30: sequencer curves run from 0 to 1, each with its own shape", () => {
+  for (const c of Object.keys(SEQ_CURVES)) {
+    assert.equal(seqShape(0, c), 0, c); assert.equal(seqShape(1, c), 1, c);
+    for (let x = 0; x < 1; x += .01) assert.ok(seqShape(x + .01, c) >= seqShape(x, c), `${c} only moves one way`);
+  }
+  near(seqShape(.5, "linear"), .5, 1e-12);
+  near(seqShape(.5, "slow"), .25, 1e-12);
+  near(seqShape(.5, "fast"), .75, 1e-12);
+  near(seqShape(.5, "s"), .5, 1e-12);
+  near(seqShape(.25, "s"), .15625, 1e-12);
+  assert.deepEqual(SEQ_ROWS.map((r) => r.id), ["up-linear", "up-slow", "up-fast", "up-s", "down-linear", "down-slow", "down-fast", "down-s"]);
+});
+
+test("D30: each note builds on where the last one left off, and holds between notes", () => {
+  const notes = [{ row: "up-linear", start: 0, len: 4 }, { row: "down-linear", start: 8, len: 2 }];
+  near(seqValue(notes, 0, .5, .2), .5, 1e-12);
+  near(seqValue(notes, 2, .5, .2), .6, 1e-12, "halfway up");
+  near(seqValue(notes, 4, .5, .2), .7, 1e-12, "arrived");
+  near(seqValue(notes, 6, .5, .2), .7, 1e-12, "holds in the gap");
+  near(seqValue(notes, 9, .5, .2), .6, 1e-12, "the down sweep starts from 0.7");
+  near(seqValue(notes, 12, .5, .2), .5, 1e-12);
+  // continuous at every step boundary
+  for (let p = 0; p < 16; p += .01) assert.ok(Math.abs(seqValue(notes, p + .01, .5, .2) - seqValue(notes, p, .5, .2)) < .006, `smooth at ${p}`);
+});
+
+test("D30: sweeping past the top or bottom of the range does nothing", () => {
+  const up = [{ row: "up-linear", start: 0, len: 2 }, { row: "up-linear", start: 2, len: 2 }, { row: "down-linear", start: 4, len: 2 }];
+  near(seqValue(up, 2, .8, .3), 1, 1e-12, "stops at the top");
+  near(seqValue(up, 3, .8, .3), 1, 1e-12, "a second sweep up does nothing");
+  near(seqValue(up, 6, .8, .3), .7, 1e-12, "coming down starts from the top");
+  near(seqValue([{ row: "down-s", start: 0, len: 4 }], 4, .1, .5), 0, 1e-12, "stops at the bottom");
+  near(seqValue([], 3, 1.4, .5), 1, 1e-12, "a setting outside the range is held at the limit");
+});
+
+test("D30: placing a note replaces any note covering that step, on any row", () => {
+  const start = [{ row: "up-s", start: 0, len: 8 }, { row: "down-s", start: 8, len: 8 }];
+  const a = placeNote(start, "down-fast", 3);
+  assert.deepEqual(a.notes, [{ row: "down-fast", start: 3, len: 1 }, { row: "down-s", start: 8, len: 8 }]);
+  assert.equal(a.index, 0);
+  const b = placeNote([], "up-linear", 5);
+  assert.deepEqual(b.notes, [{ row: "up-linear", start: 5, len: 1 }]);
+  assert.deepEqual(removeNote(start, 0), [{ row: "down-s", start: 8, len: 8 }]);
+});
+
+test("D30: notes stretch forwards or backwards, but not into their neighbours or past the ends", () => {
+  const notes = [{ row: "up-s", start: 2, len: 2 }, { row: "up-s", start: 6, len: 2 }, { row: "down-s", start: 12, len: 1 }];
+  assert.deepEqual(resizeNote(notes, 1, "end", 10, 16).notes[1], { row: "up-s", start: 6, len: 4 }, "forwards");
+  assert.deepEqual(resizeNote(notes, 1, "end", 15, 16).notes[1], { row: "up-s", start: 6, len: 6 }, "stops at the next note");
+  assert.deepEqual(resizeNote(notes, 1, "start", 5, 16).notes[1], { row: "up-s", start: 5, len: 3 }, "backwards");
+  assert.deepEqual(resizeNote(notes, 1, "start", 0, 16).notes[1], { row: "up-s", start: 4, len: 4 }, "stops at the note before");
+  assert.deepEqual(resizeNote(notes, 1, "end", 2, 16).notes[1], { row: "up-s", start: 6, len: 1 }, "never under one step");
+  assert.deepEqual(resizeNote(notes, 1, "start", 9, 16).notes[1], { row: "up-s", start: 7, len: 1 });
+  assert.deepEqual(resizeNote(notes, 2, "end", 30, 16).notes[2], { row: "down-s", start: 12, len: 4 }, "the pattern's end");
+  assert.deepEqual(resizeNote(notes, 0, "start", -3, 16).notes[0], { row: "up-s", start: 0, len: 4 }, "the pattern's start");
+});
+
+test("D30: patterns load cleanly, off by default, and shrink to one bar keeping what fits", () => {
+  const d = normaliseSeq(undefined);
+  assert.equal(d.on, false); assert.equal(d.target, "direct"); assert.equal(d.trigger, "first"); assert.equal(d.bars, 1);
+  assert.deepEqual(d.notes, DEFAULT_SEQ.notes);
+  near(seqValue(d.notes, 16, .5, .25), .5, 1e-12, "the default pattern ends where it started, so it loops smoothly");
+  const bad = normaliseSeq({ bars: 3, trigger: "x", notes: [{ row: "up-s", start: 4, len: 4 }, { row: "nope", start: 0, len: 1 }, { row: "down-s", start: 6, len: 2 }, { row: "up-s", start: 14, len: 9 }] });
+  assert.equal(bad.bars, 1); assert.equal(bad.trigger, "first");
+  assert.deepEqual(bad.notes, [{ row: "up-s", start: 4, len: 4 }, { row: "up-s", start: 14, len: 2 }]);
+  const two = normaliseSeq({ bars: 2, notes: [{ row: "up-s", start: 12, len: 8 }, { row: "down-s", start: 24, len: 4 }] });
+  assert.equal(seqSteps(two.bars), 32);
+  assert.deepEqual(setBars(two, 1).notes, [{ row: "up-s", start: 12, len: 4 }]);
+});
+
+test("D30: the sequencer runs in 16th notes of the autoplay tempo and loops", () => {
+  near(stepSeconds(120), .125, 1e-12);
+  near(seqPosition(.5, 120, 16), 4, 1e-9);
+  near(seqPosition(2.25, 120, 16), 2, 1e-9, "one bar at 120 bpm is 2 s");
+  near(seqPosition(2.25, 120, 32), 18, 1e-9);
 });

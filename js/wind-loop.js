@@ -9,6 +9,7 @@ import { applyWind } from './audio.js';
 import { ctl } from './controls.js';
 import { ped, placeDot } from './treadles.js';
 import { stepAutoplay, autoplayOn } from './autoplay.js';
+import { seqAir, seqPlaying } from './modseq.js';
 
 let needle, rWind, rPitch, rReeds, rUse, statusEl;
 let last = performance.now(), uiT = 0;
@@ -46,10 +47,13 @@ function frame(now) {
   const help = ctl.helperRate();
   inflow += help * Math.max(0, Math.min(1, (.8 - S.pressure) / .12));   // helper eases off near full
 
+  const seq = seqAir();                // the modulation sequencer's wind, or null (D30)
   if (S.directWind) {
     // Direct wind (D26): the slider sets the reservoir's pressure, and nothing
-    // else moves it. A short glide stops sudden jumps from clicking.
-    S.pressure += (ctl.directAir.value - S.pressure) * Math.min(1, dt / .06);
+    // else moves it, except the modulation sequencer while it plays. A short
+    // glide stops sudden jumps from clicking; shorter for the sequencer, so its
+    // curves keep their shape.
+    S.pressure += ((seq ?? ctl.directAir.value) - S.pressure) * Math.min(1, dt / (seq === null ? .06 : .025));
     S.reliefT = 0;
   } else {
     S.pressure += (inflow - drain) * dt / ctl.res.value;                    // a bigger reservoir changes more slowly
@@ -80,7 +84,7 @@ function frame(now) {
     }
     let msg = '', ok = false;
     if (!S.started) { msg = 'Press a key to start'; ok = true; }
-    else if (S.directWind) { msg = 'Direct wind'; ok = true; }
+    else if (S.directWind) { msg = seqPlaying() ? 'Sequencer moving the wind' : 'Direct wind'; ok = true; }
     else if (S.reliefT > 0) msg = 'Relief valve venting';
     else if (S.pressure < .05 && sounding) msg = 'Out of wind. Pump!';
     else if (S.pressure < .2) msg = 'Wind is low';
