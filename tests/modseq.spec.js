@@ -1,8 +1,9 @@
-// The modulation sequencer (D30): its piano roll, and how it moves Direct wind.
+// The modulation sequencer (D30, D31): its piano roll, and how it moves Direct
+// wind, the Vox Humana fan's speed and the knee swell.
 // The wind is read from the gauge's needle every frame (window.__gaugeTrace in
 // organ.js). Patterns run at 120 bpm, so one bar is 2 s and a 16th is 125 ms.
 import { test, expect } from "@playwright/test";
-import { openOrgan, setSlider, gaugeTrace, readout } from "./organ.js";
+import { openOrgan, setSlider, gaugeTrace, readout, toggleStop, rms, db } from "./organ.js";
 
 const A3 = 57, C4 = 60;
 const on = (m) => [0x90, m, 100], off = (m) => [0x80, m, 0];
@@ -92,13 +93,15 @@ test("First note starts once per phrase; Each note restarts on every key (D30)",
   const more = await gaugeTrace(page, 500, [on(C4)]);         // a second key 1.1 s in
   await midi(page, off(A3), off(C4)); await page.waitForTimeout(600);
   expect(at(first, 1.0)).toBeCloseTo(1.9, 1);
-  expect(at(more, 0.4)).toBeCloseTo(2.35, 1);                // still climbing, 1.5 s into the bar
+  // still climbing, about 1.5 s into the bar (2.35″); a restart would read about 1.36″.
+  // Ranges, not exact values: the second call starts a few tens of ms after the first ends.
+  expect(at(more, 0.4)).toBeGreaterThan(2.2); expect(at(more, 0.4)).toBeLessThan(2.6);
   await page.selectOption("#seqTrigger", "each");
   const first2 = await gaugeTrace(page, 1100, [on(A3)]);
   const again = await gaugeTrace(page, 500, [on(C4)]);
   await midi(page, off(A3), off(C4));
   expect(at(first2, 1.0)).toBeCloseTo(1.9, 1);
-  expect(at(again, 0.4)).toBeCloseTo(1.36, 1);               // started again: 0.4 s into the bar
+  expect(at(again, 0.4)).toBeGreaterThan(1.25); expect(at(again, 0.4)).toBeLessThan(1.55);   // started again: 0.4 s into the bar
 });
 
 test("the piano roll: place, replace, stretch, shorten, delete, clear and length (D30)", async ({ page }) => {
@@ -162,4 +165,97 @@ test("the sequencer only moves the wind while Direct wind is on (D30)", async ({
   const v = between(tr, 0.3, 1.2);
   expect(Math.max(...v) - Math.min(...v)).toBeLessThan(0.2);
   await expect(page.locator("#status")).not.toHaveText("Sequencer moving the wind");
+});
+
+/* ---------- D31: the fan and the swell ---------- */
+// How fast the treble flickers (the fan's blade passes), from the speakers' upper
+// band sampled every 8 ms: crossings of its median level, between t0 and t1 s.
+function flickerHz(frames, t0, t1) {
+  const v = frames.slice(Math.round(t0 / 0.008), Math.round(t1 / 0.008)).map(([l, r]) => 10 * Math.log10(l[1] + r[1]));
+  const m = [...v].sort((a, b) => a - b)[v.length >> 1];
+  let c = 0; for (let i = 1; i < v.length; i++) if ((v[i - 1] < m) !== (v[i] < m)) c++;
+  return c / 2 / (t1 - t0);
+}
+const avgRms = async (page, n = 8) => { let s = 0; for (let i = 0; i < n; i++) { s += await rms(page); await page.waitForTimeout(60); } return s / n; };
+const fanSpeed = (page, v) => page.$eval("#voxRate", (el, x) => { el.value = x; el.dispatchEvent(new Event("input", { bubbles: true })); }, v);
+
+test("choosing what it moves turns that on: the fan draws the Vox Humana; the swell needs nothing (D31)", async ({ page }) => {
+  await setup(page);
+  await expect(page.locator("#seqTarget option")).toHaveText(["Direct wind", "Vox Humana fan speed", "Knee swell"]);
+  await page.selectOption("#seqTarget", "fan");                 // while the sequencer is off, nothing changes
+  await expect(page.getByRole("button", { name: "Vox Humana tremolo" })).toHaveAttribute("aria-pressed", "false");
+  await expect(page.locator("#seqAmountOut")).toHaveText("25% · 2.8 Hz");
+  await page.check("#seqOn");
+  await expect(page.getByRole("button", { name: "Vox Humana tremolo" })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator("#voxPanel")).toHaveAttribute("open", "");
+  await expect(page.locator("#directOn")).not.toBeChecked();
+  await page.selectOption("#seqTarget", "swell");
+  await expect(page.locator("#seqAmountOut")).toHaveText("25% of the swell");
+  await expect(page.locator("#directOn")).not.toBeChecked();
+  await page.selectOption("#seqTarget", "direct");                // choosing Direct wind while on turns it on
+  await expect(page.locator("#directOn")).toBeChecked();
+  await page.selectOption("#seqTarget", "fan");
+  await page.reload();
+  expect(await page.locator("#seqTarget").inputValue()).toBe("fan");
+  await expect(page.locator("#seqAmountOut")).toHaveText("25% · 2.8 Hz");
+});
+
+test("the sequencer drives the fan's speed, then lets it ease back to its slider (D31)", async ({ page }) => {
+  await setup(page);
+  await toggleStop(page, "Melodia 8′");                          // Diapason alone: plenty of treble for the fan
+  await fanSpeed(page, 3);
+  await page.selectOption("#seqTarget", "fan");
+  await page.check("#seqOn");                                     // draws the Vox Humana
+  await setSlider(page, "seqAmountAmt", 50);                      // 5.5 Hz
+  await page.click("#seqClear");
+  await cell(page, "up-linear", 0).click();                      // straight up in one 16th, then hold
+  await page.waitForTimeout(2500);                                // the fan spins up to 3 Hz
+  await midi(page, on(A3));
+  const playing = await page.evaluate(() => window.__sample(2000));
+  await midi(page, off(A3));
+  await page.waitForTimeout(3000);                                // the fan coasts back to its slider
+  await page.uncheck("#seqOn");
+  await midi(page, on(A3));
+  const plain = await page.evaluate(() => window.__sample(2000));
+  await midi(page, off(A3));
+  expect(flickerHz(playing, 0.3, 1.9)).toBeGreaterThan(7.8);      // 3 + 5.5 = 8.5 Hz
+  expect(flickerHz(playing, 0.3, 1.9)).toBeLessThan(9.2);
+  expect(flickerHz(plain, 0.3, 1.9)).toBeGreaterThan(2.5);        // its own 3 Hz
+  expect(flickerHz(plain, 0.3, 1.9)).toBeLessThan(3.6);
+  expect(await page.locator("#voxOut").textContent()).toBe("3.0 Hz");   // the slider didn't move
+});
+
+test("the sequencer opens the knee swell without moving its slider, and lets it close again (D31)", async ({ page }) => {
+  await setup(page);
+  await toggleStop(page, "Melodia 8′");
+  await page.selectOption("#seqTarget", "swell");
+  await setSlider(page, "seqAmountAmt", 100);
+  await page.click("#seqClear");
+  await cell(page, "up-linear", 0).click();                      // fully open in one 16th, then hold
+  await midi(page, on(A3)); await page.waitForTimeout(900);
+  const closed = await avgRms(page);
+  await midi(page, off(A3)); await page.waitForTimeout(700);
+  await page.check("#seqOn");
+  await midi(page, on(A3)); await page.waitForTimeout(900);
+  const open = await avgRms(page);
+  await midi(page, off(A3)); await page.waitForTimeout(900);
+  await expect(page.locator("#swellOut")).toHaveText("Closed");
+  await page.uncheck("#seqOn");
+  await midi(page, on(A3)); await page.waitForTimeout(900);
+  const after = await avgRms(page);
+  await midi(page, off(A3));
+  expect(db(open / closed)).toBeGreaterThan(4.5);                 // fully open is about 6 dB louder (D21)
+  expect(db(open / closed)).toBeLessThan(7.5);
+  expect(Math.abs(db(after / closed))).toBeLessThan(1);           // and it closed again
+});
+
+test("the fan only follows the sequencer while the Vox Humana is drawn (D31)", async ({ page }) => {
+  await setup(page);
+  await page.selectOption("#seqTarget", "fan");
+  await page.check("#seqOn");
+  await toggleStop(page, "Vox Humana tremolo");                    // retire it again
+  await midi(page, on(A3)); await page.waitForTimeout(300);
+  await expect(page.getByRole("button", { name: "Vox Humana tremolo" })).toHaveAttribute("aria-pressed", "false");   // playing doesn't redraw it
+  await expect(page.locator("#seqGrid .seq-play")).toBeHidden();
+  await midi(page, off(A3));
 });

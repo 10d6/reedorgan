@@ -276,3 +276,31 @@ These come from the owner's own feedback and apply to every change:
 **Tests:** `tests/modseq.spec.js` (8 tests) and 7 unit tests. Each of these planted bugs was caught: no limit between notes, notes not building on each other, Each note ignored, not stopping on release, editing keys pumping the treadles, and turning it on without turning Direct wind on.
 
 **Next (stage 2):** Vox Humana fan speed and Knee swell in the Moves menu. Choosing the fan will draw the Vox Humana stop if it's in, as choosing Direct wind turns Direct wind on.
+
+## D31. The modulation sequencer, stage 2: the fan and the swell
+
+**Chosen:** the sequencer's **Moves** menu now has **Direct wind**, **Vox Humana fan speed** and **Knee swell**: one target at a time, as the owner chose. Each works in shares of its own range, and Amount is a share of that range too:
+- Direct wind: 0–3.6″ on the gauge.
+- Fan speed: 1–12 blade passes a second, the fan's Speed slider range.
+- Knee swell: closed to fully open.
+
+The Amount readout shows the chosen target's units: "25% · 0.9″", "25% · 2.8 Hz", "25% of the swell".
+
+- **Turning things on:** turning the sequencer on, or choosing a target while it's on, turns on what it moves. Direct wind switches on; choosing the fan draws the Vox Humana stop (which opens its drawer, D25). Choosing a target while the sequencer is off changes nothing else. The swell has nothing to turn on.
+- **When it moves:** the fan only follows the sequencer while the Vox Humana is drawn, just as Direct wind only moves while it's on. Retiring the stop stops the pattern for the fan, and playing doesn't redraw it.
+- **The sliders stay put.** As with Direct wind (D30), each pass starts from the target's own setting and the sequencer moves the sound, not the slider.
+  - **Fan:** follows the pattern with a 30 ms glide on its speed, so it changes speed smoothly without a jump in its phase. When the pattern stops, it eases back to its Speed slider the way it does when that slider moves.
+  - **Swell:** the lid follows the pattern with a 40 ms glide instead of its usual 120 ms swing, so the curves keep their shape. When the pattern stops, it swings back to the knee lever's position as usual.
+
+**How:** `TARGETS` in `js/modseq.js` gives each target its own setting (`base`), when it can move (`ready`) and how to turn it on (`enable`). `seqTick()` replaces `seqAir()` and returns `{target, value}` in the target's units. The control loop sends the fan's value to `setFanSpeed()` (in `audio.js`, which overrides the slider in `lfoFreq` while set), and uses the swell's value for the lid. `drawVox()` in `stops.js` draws the stop as clicking it would. The ranges, conversions and readout are in `core/modseq.js` (`SEQ_TARGET_RANGE`, `toShare`, `fromShare`, `amountText`).
+
+**Measured** (120 bpm; Diapason A3 alone):
+- **Fan:** Speed slider at 3 Hz, Amount 50% (5.5 Hz), a Linear sweep up in one 16th and then held. The treble flickers at 8.4 Hz while the pattern plays (3 + 5.5 = 8.5 expected) and at 3 Hz on its own afterwards. The Speed readout still shows 3.0 Hz.
+- **Swell:** slider closed, Amount 100%, a sweep up in one 16th. The note is 5.9 dB louder while the pattern plays (fully open is about 6 dB, D21) and back within 1 dB of closed afterwards. The swell readout still says Closed.
+- Direct wind behaves exactly as in D30; its tests pass unchanged.
+
+**Tests:** 4 new browser tests in `tests/modseq.spec.js` and 1 unit test. Each of these planted bugs was caught: the fan target not drawing the Vox Humana, the fan's speed never applied, the fan not easing back, the swell ignored, and the fan following the pattern without its stop drawn.
+
+**Test change:** D30's First note / Each note test now checks ranges (2.2–2.6″ carrying on, 1.25–1.55″ restarted) instead of ±0.05″. The pattern climbs 0.9″ a second and the second key is pressed by a separate call a few tens of milliseconds after the first ends, so the old tolerance failed once in testing.
+
+**Test change (D29):** the Natural variation test failed about one run in six while testing this PR. The vibrato's wander is random on every page load, and a 4.2 s window sometimes caught a calm stretch, so the "natural" timing spread came out at only 1.6× the "machine" spread (the test required 2×). It now measures 6.5 s windows and checks a fixed line between the two. Over 16 runs, machine spread was 1.1–4.0 ms and natural 6.4–8.7 ms; the test requires under 5.0 ms and over 5.2 ms. The width check was already reliable and is unchanged. The vibrato itself is unchanged.

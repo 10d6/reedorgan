@@ -1,5 +1,6 @@
-// The modulation sequencer (D30): a piano roll of sweep shapes that moves a
-// control (Direct wind, for now) in time with the tempo. Pure: no page, no audio.
+// The modulation sequencer (D30, D31): a piano roll of sweep shapes that moves
+// one control (Direct wind, the Vox Humana fan's speed or the knee swell) in
+// time with the tempo. Pure: no page, no audio.
 //
 // The pattern is one or two bars of 16th notes. Each row is a shape: a sweep up
 // or a sweep down, along one of a few curves. A note on a row moves the control
@@ -29,7 +30,22 @@ const ROW = Object.fromEntries(SEQ_ROWS.map(r => [r.id, r]));
 
 export const STEPS_PER_BAR = 16, MAX_BARS = 2;
 export const SEQ_TRIGGERS = ['first', 'each'];
-export const SEQ_TARGETS = ['direct'];
+// What it can move, and each target's range: the sequencer works in shares of
+// the range (0…1), and Amount is a share of it too.
+//  direct: Direct wind, 0–3.6″ on the gauge (the reservoir's pressure, 0…1)
+//  fan:    the Vox Humana fan's speed, 1–12 blade passes a second, as its slider
+//  swell:  the knee swell, closed to fully open
+export const SEQ_TARGET_RANGE = { direct: [0, 3.6], fan: [1, 12], swell: [0, 100] };
+export const SEQ_TARGETS = Object.keys(SEQ_TARGET_RANGE);
+// A target's value as a share of its range, and back.
+export const toShare = (target, v) => { const [lo, hi] = SEQ_TARGET_RANGE[target]; return (v - lo) / (hi - lo); };
+export const fromShare = (target, s) => { const [lo, hi] = SEQ_TARGET_RANGE[target]; return lo + s * (hi - lo); };
+// The Amount readout: the percentage, and what it comes to in the target's units.
+export function amountText(target, pct) {
+  if (pct === 0) return 'None';
+  const span = SEQ_TARGET_RANGE[target][1] - SEQ_TARGET_RANGE[target][0], d = pct / 100 * span;
+  return target === 'direct' ? `${pct}% · ${d.toFixed(1)}″` : target === 'fan' ? `${pct}% · ${d.toFixed(1)} Hz` : `${pct}% of the swell`;
+}
 
 // Off by default. The starting pattern is one bar that swells the wind up over
 // the first half and back down over the second, so it loops smoothly.

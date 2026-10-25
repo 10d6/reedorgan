@@ -46,6 +46,14 @@ function renderStops() {
   stopsEl.appendChild(group('Whole keyboard', [vox, sub, sup]));
 }
 
+// Draws the Vox Humana stop, as clicking it would (the modulation sequencer
+// does this when it's set to move the fan, D31).
+export function drawVox() {
+  if (stops.vox) return;
+  stops.vox = true; document.getElementById('voxPanel').open = true;
+  renderStops(); initAudio(); applyStops();
+}
+
 export function setupStops() {
   stopsEl = document.getElementById('stops');
   const splitEl = document.getElementById('split');
